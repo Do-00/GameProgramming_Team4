@@ -6,12 +6,12 @@ public class PlayerMove : NetworkBehaviour
 {
     [Header("이동 설정")]
     public float speed = 10f;
-    public float jumpHeight = 5f;
-    public float dashForce = 15f; // 대시 힘
+    public float jumpHeight = 7f;
+    public float dashForce = 40f; // 대시 초기 폭발력
 
     private Rigidbody rb;
     private Vector3 moveInput;
-    private bool isDashing = false; // 지금 대시 상태 확인 변수
+    private bool isDashing = false;
 
     void Start()
     {
@@ -21,35 +21,66 @@ public class PlayerMove : NetworkBehaviour
 
     void Update()
     {
-        if (!IsOwner) return; // 소유 캐릭터만 조종
+        if (!IsOwner) return;
 
         float moveX = Input.GetAxisRaw("Horizontal");
         float moveZ = Input.GetAxisRaw("Vertical");
         moveInput = new Vector3(moveX, 0f, moveZ).normalized;
 
-        // 점프
-        if (Input.GetKeyDown(KeyCode.Space))
+        // 이동 방향으로 회전
+        if (moveInput != Vector3.zero)
         {
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(moveInput), Time.deltaTime * 10f);
+        }
+
+        // 점프 (Y축 속도가 0에 가까울 때 = 땅에 있을 때만)
+        if (Input.GetKeyDown(KeyCode.Space) && Mathf.Abs(rb.linearVelocity.y) < 0.1f)
+        {
+            rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
             rb.AddForce(Vector3.up * jumpHeight, ForceMode.Impulse);
         }
 
-        // 대시 (왼쪽 Shift키)
-        if (Input.GetKeyDown(KeyCode.LeftShift))
+        // 대시 (Shift)
+        if (Input.GetKeyDown(KeyCode.LeftShift) && !isDashing)
         {
-            // 바라보는 방향(이동 방향)으로 순간적인 힘을 가함
-            // 만약 가만히 서있다면 캐릭터가 바라보는 앞쪽으로 대시
-            Vector3 dashDirection = moveInput != Vector3.zero ? moveInput : transform.forward;
-            rb.AddForce(dashDirection * dashForce, ForceMode.Impulse);
-
             isDashing = true;
-            Invoke("ResetDash", 0.5f); // 0.5초 뒤에 대시 상태 해제 (유니티 내장 타이머 함수)
+
+            // 누르는 순간 앞으로 강하게 나감
+            rb.AddForce(transform.forward * dashForce, ForceMode.Impulse);
+
+            // 0.5초 후에 대시 상태 해제
+            Invoke("ResetDash", 0.7f);
         }
     }
 
     void FixedUpdate()
     {
         if (!IsOwner) return;
-        rb.MovePosition(rb.position + moveInput * speed * Time.fixedDeltaTime);
+
+        // 우리가 방향키로 가고 싶은 목표 속도
+        Vector3 targetVelocity = moveInput * speed;
+
+        // 현재 내 캐릭터의 속도 (여기서 Y축 중력은 0으로 빼둬서 절대 건드리지 않음!)
+        Vector3 currentVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+
+        // 목표 속도가 되려면 '얼마나 힘을 더 줘야 하는지' 계산
+        Vector3 velocityChange = targetVelocity - currentVelocity;
+
+        if (isDashing)
+        {
+            // 대시 중: 브레이크(속도 강제 고정)를 걸지 않음
+            // 대신, 방향키(moveInput)를 누르면 그 방향으로 살짝 힘을 줘서 방향을 틀 수 있게 해줌.
+            if (moveInput != Vector3.zero)
+            {
+                rb.AddForce(moveInput * (speed * 0.5f), ForceMode.Acceleration);
+            }
+        }
+        else
+        {
+            // 평소: 계산한 힘을 즉각적으로 적용해서 딱 원하는 속도만큼만 걷게 함.
+            // Y축은 건드리지 않았으니 중력은 유니티 엔진이 알아서 처리
+            rb.AddForce(velocityChange, ForceMode.VelocityChange);
+        }
     }
 
     void ResetDash()
@@ -57,41 +88,28 @@ public class PlayerMove : NetworkBehaviour
         isDashing = false;
     }
 
-    // 여기서부터가 멀티플레이 상호작용이에용
+    // --- 상호작용 (팀원 밀치기) ---
     void OnCollisionEnter(Collision collision)
     {
-        if (!IsOwner) return; // 사용자가 부딪힌 것만 판정
+        if (!IsOwner) return;
 
-        // 내가 대시 중이고 && 부딪힌 상대가 'Player' 태그를 가졌다면
         if (isDashing && collision.gameObject.CompareTag("Player"))
         {
-            // 상대방의 네트워크 신분증(ID)을 빼앗아옴
             ulong targetId = collision.gameObject.GetComponent<NetworkObject>().NetworkObjectId;
-
-            // 튕겨나갈 방향 계산 (내 위치에서 팀원 위치로 향하는 방향)
-            Vector3 pushDirection = (collision.transform.position - transform.position).normalized;
-            // 위쪽으로도 살짝 뜨게 만들기
-            pushDirection.y = 0.5f;
-
-            // 서버에게 저 ID 가진 녀석 좀 이 방향으로 빵 차버려달라고 요청 (RPC 호출)
-            PushPlayerServerRpc(targetId, pushDirection);
+            Vector3 pushDirection = transform.forward + new Vector3(0, 0.5f, 0);
+            PushPlayerServerRpc(targetId, pushDirection.normalized);
         }
     }
 
-    // [ServerRpc]가 붙은 함수는 클라이언트가 실행해도 무조건 '서버 컴퓨터'에서 동작
-    // 서버에게 부탁하려면 함수 이름 끝에 무조건 ServerRpc를 붙여야 하는 규칙이 있다네요
     [ServerRpc]
     void PushPlayerServerRpc(ulong targetNetworkId, Vector3 direction)
     {
-        // 서버의 명부에서 해당 ID를 가진 플레이어를 찾음
         if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(targetNetworkId, out NetworkObject targetObject))
         {
             Rigidbody targetRb = targetObject.GetComponent<Rigidbody>();
             if (targetRb != null)
             {
-                // 서버가 그 플레이어에게 물리적인 힘을 가해서 튕겨냄
-                // 서버에서 밀면 NetworkTransform이 알아서 모두의 화면에 날아가는 걸 보여줌
-                targetRb.AddForce(direction * 20f, ForceMode.Impulse);
+                targetRb.AddForce(direction * 25f, ForceMode.Impulse);
             }
         }
     }
