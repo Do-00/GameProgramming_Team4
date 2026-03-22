@@ -1,47 +1,53 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using Unity.Netcode;
 
-public class PlayerMove : MonoBehaviour
+
+[RequireComponent(typeof(Rigidbody))]
+
+public class PlayerMove : NetworkBehaviour
 {
-    private Rigidbody rb; // 변수명을 rb로 변경 (가독성)
+    [Header("이동 설정")]
     public float speed = 10f;
     public float jumpHeight = 3f;
-    public float dash = 5f; // 'g'를 'f'로 수정
+    // Dash는 상호작용할 때 쓸 거라 지금 이동 로직에선 일단 보류함
+    public float dash = 5f;
 
-    private Vector3 dir = Vector3.zero;
+    private Rigidbody rb;
+    private Vector3 moveInput;
 
     void Start()
     {
-        // Rigidbody 가져오기
         rb = GetComponent<Rigidbody>();
+
+        //물리 힘에 의해 오뚝이처럼 쓰러지는 걸 방지
+        rb.freezeRotation = true;
     }
 
     void Update()
     {
-        // 입력 받기
-        dir.x = Input.GetAxisRaw("Horizontal"); // 즉각적인 반응 위해 GetAxisRaw 사용
-        dir.z = Input.GetAxisRaw("Vertical");
+        //이 캐릭터의 주인이 내가 아니면(IsOwner가 false면), 키보드 입력 무시
+        if (!IsOwner) return;
 
-        // 회전 처리
-        if (dir != Vector3.zero)
+        //Input System (Old)
+        float moveX = Input.GetAxisRaw("Horizontal");
+        float moveZ = Input.GetAxisRaw("Vertical");
+
+        //대각선 속도 보정 (.normalized)
+        moveInput = new Vector3(moveX, 0f, moveZ).normalized;
+
+        //점프 (스페이스바)
+        if (Input.GetKeyDown(KeyCode.Space))
         {
-            transform.forward = dir;
+            rb.AddForce(Vector3.up * jumpHeight, ForceMode.Impulse);
         }
     }
 
     void FixedUpdate()
     {
-        // 물리 이동
-        Move();
-    }
+        //물리 이동 본인 것만 처리
+        if (!IsOwner) return;
 
-    void Move()
-    {
-        // 수평 이동 방향 계산
-        Vector3 moveDir = dir.normalized * speed;
-
-        // Y축 속도는 유지 (점프/중력 자연스럽게)
-        rb.linearVelocity = new Vector3(moveDir.x, rb.linearVelocity.y, moveDir.z);
+        //현재 위치에서 입력받은 방향으로 스무스하게 이동
+        rb.MovePosition(rb.position + moveInput * speed * Time.fixedDeltaTime);
     }
 }
