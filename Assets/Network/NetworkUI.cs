@@ -123,21 +123,21 @@ public class NetworkUI : MonoBehaviour
         backBtn.gameObject.SetActive(true);
     }
 
-    private async void StartRelayHost() // 방장으로서 릴레이 서버에 방을 만들고, 참가자들이 접속할 수 있도록 코드 생성 및 네트워크 매니저 설정
+    private async void StartRelayHost()
     {
         try
         {
-            Allocation allocation = await RelayService.Instance.CreateAllocationAsync(3); // 최대 3명의 참가자가 접속할 수 있는 방 생성
-            string joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);  // 생성된 방의 입장 코드를 가져옴
+            Allocation allocation = await RelayService.Instance.CreateAllocationAsync(3);
+            string joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
 
-            HideAllUI();  // 방장이 방을 만들면 모든 UI를 숨기고 게임 화면만 보이도록 설정
-            codeText.gameObject.SetActive(true);  // 방 코드 텍스트 활성화
+            HideAllUI();
+            codeText.gameObject.SetActive(true);
             codeText.text = "방 코드: " + joinCode;
             Debug.Log("입장 코드: " + joinCode);
 
-            RelayServerData relayServerData = new RelayServerData(allocation, "dtls");  // 릴레이 서버 데이터를 생성하여 네트워크 매니저의 트랜스포트에 설정
-            NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(relayServerData);  // 네트워크 매니저의 트랜스포트에 릴레이 서버 데이터 설정
+            RelayServerData relayServerData = AllocationUtils.ToRelayServerData(allocation, "dtls");
 
+            NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(relayServerData);
             NetworkManager.Singleton.StartHost();
         }
         catch (RelayServiceException e)
@@ -146,21 +146,21 @@ public class NetworkUI : MonoBehaviour
         }
     }
 
-    private async void StartRelayClient()  // 참가자로서 입력된 방 코드로 릴레이 서버에 접속을 시도하고, 네트워크 매니저를 클라이언트 모드로 시작
+    private async void StartRelayClient()
     {
         try
         {
-            string joinCode = codeInputField.text;  // 입력된 방 코드 가져오기
-            Debug.Log("다음 코드로 접속 시도 중 : " + joinCode);
+            string joinCode = codeInputField.text;
+            Debug.Log("다음 코드로 접속 시도 중... : " + joinCode);
 
-            JoinAllocation joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode);  // 입력된 방 코드로 릴레이 서버에 접속 시도하여 참가자 정보를 가져옴
+            JoinAllocation joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode);
 
-            RelayServerData relayServerData = new RelayServerData(joinAllocation, "dtls");  // 릴레이 서버 데이터를 생성하여 네트워크 매니저의 트랜스포트에 설정
-            NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(relayServerData);  // 네트워크 매니저의 트랜스포트에 릴레이 서버 데이터 설정
+            RelayServerData relayServerData = AllocationUtils.ToRelayServerData(joinAllocation, "dtls");
 
+            NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(relayServerData);
             NetworkManager.Singleton.StartClient();
 
-            HideAllUI(); // 참가자가 방에 접속하면 모든 UI를 숨기고 게임 화면만 보이도록 설정
+            HideAllUI();
         }
         catch (RelayServiceException e)
         {
