@@ -152,6 +152,8 @@ GameObject:
   - component: {fileID: -8139383308975847038}
   - component: {fileID: 8435986807177160417}
   - component: {fileID: 6204787296842018849}
+  - component: {fileID: 8386994822843419373}
+  - component: {fileID: 3397363135410426815}
   m_Layer: 3
   m_Name: Player
   m_TagString: Untagged
@@ -223,6 +225,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!136 &5599126938616818199
 CapsuleCollider:
@@ -371,6 +374,68 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 112
   m_CollisionDetection: 0
+--- !u!95 &8386994822843419373
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7820289106922720799}
+  m_Enabled: 1
+  m_Avatar: {fileID: 9000000, guid: 6c73f896874566645889b4e28ef6399c, type: 2}
+  m_Controller: {fileID: 9100000, guid: 26c6d92d23812eb4e83996e677b33dd8, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &3397363135410426815
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7820289106922720799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8d0727d5ae3244e3b569694d3912374, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkAnimator
+  ShowTopMostFoldoutHeaderGroup: 1
+  NetworkAnimatorExpanded: 0
+  AuthorityMode: 0
+  m_Animator: {fileID: 8386994822843419373}
+  TransitionStateInfoList: []
+  AnimatorParameterEntries:
+    ParameterEntries:
+    - name: speed
+      NameHash: 254213878
+      Synchronize: 1
+      ParameterType: 1
+    - name: flying
+      NameHash: 1244953283
+      Synchronize: 1
+      ParameterType: 4
+    - name: dash
+      NameHash: -1687233280
+      Synchronize: 1
+      ParameterType: 4
+    - name: convulsing
+      NameHash: 22054361
+      Synchronize: 1
+      ParameterType: 4
+    - name: dancing
+      NameHash: 1090697419
+      Synchronize: 1
+      ParameterType: 4
+  AnimatorParametersExpanded: 0
 --- !u!1001 &1472164766457042500
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -542,6 +607,18 @@ PrefabInstance:
     - target: {fileID: 4311629582287283170, guid: abc10fd563a657f4190dc0dbe07723a9, type: 3}
       propertyPath: m_Layer
       value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: abc10fd563a657f4190dc0dbe07723a9, type: 3}
+      propertyPath: m_Avatar
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: abc10fd563a657f4190dc0dbe07723a9, type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: abc10fd563a657f4190dc0dbe07723a9, type: 3}
+      propertyPath: m_ApplyRootMotion
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6386480451222621022, guid: abc10fd563a657f4190dc0dbe07723a9, type: 3}
       propertyPath: m_Layer
