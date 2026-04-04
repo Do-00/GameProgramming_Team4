@@ -17,6 +17,7 @@ public class NetworkUI : MonoBehaviour
     [SerializeField] private Button hostBtn;  // 방장 버튼
     [SerializeField] private Button clientBtn; // 참가자 버튼
     [SerializeField] private Button quitBtn;  // 종료 버튼
+    [SerializeField] private Button mainMenuSettingBtn; // 메인 메뉴 설정
 
     [Header("클라이언트 접속 전용 UI")]
     [SerializeField] private TMP_InputField codeInputField; // 방 코드 입력 필드
@@ -31,12 +32,19 @@ public class NetworkUI : MonoBehaviour
     [SerializeField] private Button resumeBtn;       // 일시정지 해제 버튼
     [SerializeField] private Button disconnectBtn;   // 서버 연결 끊고 메인 메뉴로 돌아가기 버튼
     [SerializeField] private Button inGameQuitBtn;    // 게임 종료 버튼
+    [SerializeField] private Button inGameSettingBtn; // 인게임 설정
+
+    [Header("설정 UI")]
+    [SerializeField] private GameObject settingPanel; // 설정 창 UI
+    [SerializeField] private Button closeSettingBtn;  // 설정 창 안의 닫기 버튼
+    [SerializeField] private Toggle windowModeToggle; // 창모드 토글
 
     private async void Start()  // 게임 시작 시 초기화 및 UI 설정
     {
         ShowMainMenu();
         codeText.gameObject.SetActive(false);  // 방 코드 텍스트는 처음에 숨김
         pausePanel.SetActive(false);         // 일시정지 패널도 처음에는 숨김
+        settingPanel.SetActive(false);      // 게임 시작 시 설정창 숨기기
 
         if (UnityServices.State != ServicesInitializationState.Initialized)  // 유니티 서비스가 초기화되지 않았다면 초기화 진행
         {
@@ -49,16 +57,26 @@ public class NetworkUI : MonoBehaviour
             Debug.Log("유니티 클라우드 익명 로그인 완료!");
         }
 
+        // 게임 시작 시 현재 화면 상태를 체크해서 토글에 반영 (전체화면이 아니면 창모드 켜짐)
+        if (windowModeToggle != null)
+        {
+            windowModeToggle.isOn = !Screen.fullScreen;
+            windowModeToggle.onValueChanged.AddListener(SetWindowMode);
+        }
+
         // 함수 연결
         hostBtn.onClick.AddListener(StartRelayHost);
         clientBtn.onClick.AddListener(ShowInputUI);
         joinConfirmBtn.onClick.AddListener(StartRelayClient);
         backBtn.onClick.AddListener(ShowMainMenu);
         quitBtn.onClick.AddListener(QuitGame);
+        mainMenuSettingBtn.onClick.AddListener(OpenSettings); //메인 설정
 
         resumeBtn.onClick.AddListener(TogglePauseMenu);
         disconnectBtn.onClick.AddListener(DisconnectAndReturnToMenu);
         inGameQuitBtn.onClick.AddListener(QuitGame);
+        inGameSettingBtn.onClick.AddListener(OpenSettings); //인게임 설정
+        closeSettingBtn.onClick.AddListener(CloseSettings); // 설정창 닫기 버튼
     }
 
     private void Update()  // 매 프레임마다 일시정지 메뉴 토글을 위한 입력 감지
@@ -106,6 +124,7 @@ public class NetworkUI : MonoBehaviour
         hostBtn.gameObject.SetActive(true);
         clientBtn.gameObject.SetActive(true);
         quitBtn.gameObject.SetActive(true);
+        mainMenuSettingBtn.gameObject.SetActive(true); // 추가
 
         codeInputField.gameObject.SetActive(false);
         joinConfirmBtn.gameObject.SetActive(false);
@@ -178,6 +197,38 @@ public class NetworkUI : MonoBehaviour
 #endif
     }
 
+    // 설정창 열기
+    private void OpenSettings()
+    {
+        Debug.Log("설정창 열기 버튼 눌림!");
+        settingPanel.SetActive(true);
+    }
+
+    // 설정창 닫기
+    private void CloseSettings()
+    {
+        Debug.Log("설정창 닫힘!");
+        settingPanel.SetActive(false);
+    }
+
+    // 창모드
+    private void SetWindowMode(bool isWindowed)
+    {
+        if (isWindowed)
+        {
+            // 체크박스가 켜지면 창모드로 변경
+            Screen.fullScreenMode = FullScreenMode.Windowed;
+            Screen.SetResolution(1280, 720, false); //화면 크기 지정
+            Debug.Log("창모드로 전환됨");
+        }
+        else
+        {
+            // 체크박스가 꺼지면 전체화면(테두리 없는 전체화면)으로 변경
+            Screen.fullScreenMode = FullScreenMode.FullScreenWindow;
+            Debug.Log("전체화면으로 전환됨");
+        }
+    }
+
     private void HideAllUI()  // 모든 UI 요소를 비활성화하여 게임 화면만 보이도록 설정
     {
         hostBtn.gameObject.SetActive(false);
@@ -186,5 +237,8 @@ public class NetworkUI : MonoBehaviour
         codeInputField.gameObject.SetActive(false);
         joinConfirmBtn.gameObject.SetActive(false);
         backBtn.gameObject.SetActive(false);
+        mainMenuSettingBtn.gameObject.SetActive(false); //추가
+
+        settingPanel.SetActive(false); // 추가
     }
 }

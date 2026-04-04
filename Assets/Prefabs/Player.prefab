@@ -18,7 +18,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2352978005673374009
 Transform:
   m_ObjectHideFlags: 0
@@ -149,11 +149,11 @@ GameObject:
   - component: {fileID: 7645752991948801712}
   - component: {fileID: 5599126938616818199}
   - component: {fileID: 4027824215155571714}
-  - component: {fileID: -8139383308975847038}
   - component: {fileID: 8435986807177160417}
   - component: {fileID: 6204787296842018849}
   - component: {fileID: 8386994822843419373}
   - component: {fileID: 3397363135410426815}
+  - component: {fileID: 5852207011137598640}
   m_Layer: 3
   m_Name: Player
   m_TagString: Untagged
@@ -275,32 +275,6 @@ MonoBehaviour:
   AutoObjectParentSync: 1
   SyncOwnerTransformWhenParented: 1
   AllowOwnerToParent: 0
---- !u!114 &-8139383308975847038
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7820289106922720799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 11a33a35208e4df44b785c16e86f2a39, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
-  ShowTopMostFoldoutHeaderGroup: 1
-  walkSpeed: 5
-  sprintSpeed: 15
-  flySpeed: 10
-  flyStrafeSpeed: 12
-  jumpForce: 8
-  dashSpeed: 40
-  groundDashDuration: 0.2
-  flyDashDuration: 0.15
-  dashCooldown: 1.5
-  dashFriction: 5
-  groundCheckDistance: 1.1
-  playerCamera: {fileID: 1435768977626213993}
-  mouseSensitivity: 2
 --- !u!114 &8435986807177160417
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -436,6 +410,32 @@ MonoBehaviour:
       Synchronize: 1
       ParameterType: 4
   AnimatorParametersExpanded: 0
+--- !u!114 &5852207011137598640
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7820289106922720799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11a33a35208e4df44b785c16e86f2a39, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
+  ShowTopMostFoldoutHeaderGroup: 1
+  walkSpeed: 10
+  sprintSpeed: 15
+  flySpeed: 20
+  flyStrafeSpeed: 12
+  jumpForce: 8
+  dashSpeed: 40
+  groundDashDuration: 0.2
+  flyDashDuration: 0.15
+  dashCooldown: 1.5
+  dashFriction: 5
+  groundCheckDistance: 1.1
+  playerCamera: {fileID: 1435768977626213993}
+  mouseSensitivity: 2
 --- !u!1001 &1472164766457042500
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -520,6 +520,10 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 3
       objectReference: {fileID: 0}
+    - target: {fileID: -6359287411476991497, guid: abc10fd563a657f4190dc0dbe07723a9, type: 3}
+      propertyPath: m_CastShadows
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: -6116727749810235759, guid: abc10fd563a657f4190dc0dbe07723a9, type: 3}
       propertyPath: m_Layer
       value: 3
@@ -567,6 +571,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: abc10fd563a657f4190dc0dbe07723a9, type: 3}
       propertyPath: m_Layer
       value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: abc10fd563a657f4190dc0dbe07723a9, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1166754175604888097, guid: abc10fd563a657f4190dc0dbe07723a9, type: 3}
       propertyPath: m_Layer

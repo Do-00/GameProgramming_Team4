@@ -38,7 +38,7 @@ public class PlayerMovement : NetworkBehaviour
     private Vector3 dashDirection;    // 대쉬 방향 (서버가 관리)
     private float currentDashSpeed = 0f;  // 현재 대쉬 속도 (서버가 관리)
 
-    
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody>(); // Rigidbody 컴포넌트를 가져옴
@@ -125,7 +125,7 @@ public class PlayerMovement : NetworkBehaviour
         {
             isFlying = !isFlying;
 
-            animator.SetBool("flying", isFlying); 
+            animator.SetBool("flying", isFlying);
         }
 
         if (isDashing)
@@ -143,7 +143,7 @@ public class PlayerMovement : NetworkBehaviour
             nextDashTime = Time.time + dashCooldown;
             currentDashSpeed = dashSpeed;
 
-          
+
 
 
             if (isFlying)
