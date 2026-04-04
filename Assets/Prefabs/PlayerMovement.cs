@@ -30,6 +30,7 @@ public class PlayerMovement : NetworkBehaviour
 
     private Rigidbody rb;
     private Vector3 inputVelocity = Vector3.zero;
+    private Animator animator; //애니메이션 
 
     private bool isDashing = false;   // 대쉬 중인지 여부 (서버가 관리)
     private float dashTimer = 0f;     // 대쉬 지속 시간 타이머
@@ -37,9 +38,11 @@ public class PlayerMovement : NetworkBehaviour
     private Vector3 dashDirection;    // 대쉬 방향 (서버가 관리)
     private float currentDashSpeed = 0f;  // 현재 대쉬 속도 (서버가 관리)
 
+    
     private void Awake()
     {
         rb = GetComponent<Rigidbody>(); // Rigidbody 컴포넌트를 가져옴
+        animator = GetComponent<Animator>(); //Animator 컴포넌트 가져옴
     }
 
     public override void OnNetworkSpawn() // 네트워크에 스폰될 때 호출되는 메서드
@@ -47,6 +50,7 @@ public class PlayerMovement : NetworkBehaviour
         // 내가 조종하는 내 캐릭터일 때
         if (IsOwner)
         {
+
             playerCamera.gameObject.SetActive(true);  // 플레이어 카메라 활성화
             if (Camera.main != null) Camera.main.gameObject.SetActive(false);  // 메인 카메라가 있다면 비활성화
 
@@ -72,6 +76,7 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (IsOwner)
         {
+            float horizontalSpeed = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z).magnitude; //실제 이동 속도 계산(수평)
             if (Cursor.lockState == CursorLockMode.None)  // 일시정지 메뉴가 열려있는 동안에는 입력을 받지 않도록 함
             {
                 inputVelocity = Vector3.zero;  // 이동 입력 초기화
@@ -81,6 +86,13 @@ public class PlayerMovement : NetworkBehaviour
             HandleLook();   // 마우스 입력을 처리하여 카메라와 플레이어의 회전을 제어하는 메서드 호출
             HandleInput();  // 키보드와 마우스 입력을 처리하여 이동, 점프, 대쉬 등의 행동을 제어하는 메서드 호출
             SubmitRotationServerRpc(transform.eulerAngles.y);  // 자신의 Y축 회전을 서버로 전송하여 다른 플레이어들에게도 적용되도록 함
+
+            animator.SetFloat("speed", horizontalSpeed); //걷는 속도 애니메이션 변수(speed)에 대입
+            animator.SetFloat("speed", horizontalSpeed); //뛸 때 속도 애니메이션 변수(speed)에 대입
+            animator.SetBool("flying", isFlying);
+            animator.SetBool("dash", isDashing);
+
+
         }
         else
         {
@@ -109,11 +121,19 @@ public class PlayerMovement : NetworkBehaviour
 
     private void HandleInput() // 키보드와 마우스 입력을 처리하여 이동, 점프, 대쉬 등의 행동을 제어하는 메서드
     {
-        if (Input.GetKeyDown(KeyCode.R)) isFlying = !isFlying;
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            isFlying = !isFlying;
+
+            animator.SetBool("flying", isFlying); 
+        }
 
         if (isDashing)
         {
             dashTimer -= Time.deltaTime;
+
+            animator.SetBool("dash", isDashing);
+
             if (dashTimer <= 0f) isDashing = false;
         }
 
@@ -123,10 +143,14 @@ public class PlayerMovement : NetworkBehaviour
             nextDashTime = Time.time + dashCooldown;
             currentDashSpeed = dashSpeed;
 
+          
+
+
             if (isFlying)
             {
                 dashDirection = playerCamera.transform.forward;
                 dashTimer = flyDashDuration;
+
             }
             else
             {
