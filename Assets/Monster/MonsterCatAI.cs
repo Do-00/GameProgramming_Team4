@@ -21,8 +21,10 @@ public class MonsterCatAI : NetworkBehaviour
 
     [Header("행동 설정")]
     [SerializeField] private float stareDuration = 2f;    // 응시 시간
-    [SerializeField] private float chargeSpeed = 210f;     // 돌진 속도
-    [SerializeField] private float chargeDuration = 0.5f;   // 돌진 지속 시간
+
+    [SerializeField] private float pounceInitialSpeed = 400f; // 처음에 튀어나가는 최대 속도
+    [SerializeField] private float pounceFriction = 3f;      // 브레이크(마찰력)
+
     [SerializeField] private float stunDuration = 5f;     // 기절 시간
 
     // 클라이언트들이 애니메이션을 맞출 수 있도록 상태를 동기화
@@ -139,14 +141,15 @@ public class MonsterCatAI : NetworkBehaviour
 
     private IEnumerator HandleChargingState()
     {
-        // 일직선 돌진
-        stateTimer = chargeDuration;
+        // 시작할 때 속도를 최고 속도로 맞춤
+        float currentPounceSpeed = pounceInitialSpeed;
 
-        while (stateTimer > 0)
+        // 시간을 재지 않고, 속도가 멈추면 루프를 탈출함
+        while (currentPounceSpeed > 0.1f)
         {
-            stateTimer -= Time.deltaTime;
+            currentPounceSpeed = Mathf.Lerp(currentPounceSpeed, 0f, Time.deltaTime * pounceFriction);
 
-            rb.linearVelocity = chargeDirection * chargeSpeed;
+            rb.linearVelocity = new Vector3(chargeDirection.x * currentPounceSpeed, rb.linearVelocity.y, chargeDirection.z * currentPounceSpeed);
 
             yield return null;
         }
@@ -184,6 +187,7 @@ public class MonsterCatAI : NetworkBehaviour
                 break;
         }
     }
+
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.red;
