@@ -119,7 +119,7 @@ public class NetworkUI : MonoBehaviour
     private void ShowMainMenu()  // 메인 메뉴 UI 활성화 및 커서 상태 조절
     {
         Cursor.lockState = CursorLockMode.None;  // 메인 메뉴에서는 커서를 보이게 하고 잠금 해제
-        Cursor.visible = true;                   
+        Cursor.visible = true;
 
         hostBtn.gameObject.SetActive(true);
         clientBtn.gameObject.SetActive(true);
