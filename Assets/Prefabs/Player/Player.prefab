@@ -1644,7 +1644,7 @@ MonoBehaviour:
   searchCooldown: 12
   foodLayer:
     serializedVersion: 2
-    m_Bits: 128
+    m_Bits: 192
   dashCooldownSlider: {fileID: 0}
   searchCooldownSlider: {fileID: 0}
   speedMultiplier:
