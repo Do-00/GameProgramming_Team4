@@ -50,11 +50,14 @@ public class PlayerMovement : NetworkBehaviour
     private Vector3 dashDirection;    // 대쉬 방향 (서버가 관리)
     private float currentDashSpeed = 0f;  // 현재 대쉬 속도 (서버가 관리)
 
+    private PlayerSkill playerSkill;
+
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody>(); // Rigidbody 컴포넌트를 가져옴
         animator = GetComponent<Animator>(); //Animator 컴포넌트 가져옴
+        playerSkill = GetComponent<PlayerSkill>();
     }
 
     public override void OnNetworkSpawn() // 네트워크에 스폰될 때 호출되는 메서드
@@ -238,13 +241,15 @@ public class PlayerMovement : NetworkBehaviour
             else rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         }
 
+        float mult = (playerSkill != null) ? playerSkill.speedMultiplier.Value : 1f;
+
         if (flyingState)
         {
-            rb.linearVelocity = velocity;
+            rb.linearVelocity = velocity * mult;
         }
         else
         {
-            rb.linearVelocity = new Vector3(velocity.x, rb.linearVelocity.y, velocity.z);
+            rb.linearVelocity = new Vector3(velocity.x * mult, rb.linearVelocity.y, velocity.z * mult);
 
             if (rb.linearVelocity.y < 0)
             {

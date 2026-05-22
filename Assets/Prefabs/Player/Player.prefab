@@ -1328,6 +1328,7 @@ GameObject:
   - component: {fileID: 8386994822843419373}
   - component: {fileID: 3397363135410426815}
   - component: {fileID: 5852207011137598640}
+  - component: {fileID: -1619367372301204948}
   m_Layer: 3
   m_Name: Player
   m_TagString: Untagged
@@ -1620,6 +1621,37 @@ MonoBehaviour:
   eggPrefab: {fileID: 641026103628060854, guid: ca670e09194011e4b9be3406875e3b94, type: 3}
   interactDistance: 4
   eatDuration: 3
+--- !u!114 &-1619367372301204948
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7820289106922720799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 57725528ecc1c6a4f80808f2fcb227aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerSkill
+  ShowTopMostFoldoutHeaderGroup: 1
+  dashSkillKey: 113
+  dashSpeedMultiplier: 3.5
+  dashSkillDuration: 1.2
+  dashSkillCooldown: 6
+  searchSkillKey: 103
+  searchRadius: 25
+  searchDuration: 4
+  searchCooldown: 12
+  foodLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  dashCooldownSlider: {fileID: 0}
+  searchCooldownSlider: {fileID: 0}
+  speedMultiplier:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 1
 --- !u!1 &8050088207021697816
 GameObject:
   m_ObjectHideFlags: 0
