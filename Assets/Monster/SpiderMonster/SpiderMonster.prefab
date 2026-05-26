@@ -83,7 +83,7 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 80
-  m_CollisionDetection: 0
+  m_CollisionDetection: 1
 --- !u!114 &4675894708172180069
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -131,6 +131,10 @@ MonoBehaviour:
   patrolSpeed: 5
   chaseSpeed: 15
   rotationSpeed: 10
+  attackRange: 2.5
+  attackDamage: 30
+  pauseDuration: 0.5
+  attackCooldown: 2
   webPrefab: {fileID: 5202365502870397226, guid: 1184dbca7d321c5489cbf1fe63fe7174, type: 3}
   webDropInterval: 5
   minWebDistance: 10

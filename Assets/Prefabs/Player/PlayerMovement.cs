@@ -27,13 +27,26 @@ public class PlayerMovement : NetworkBehaviour
     [SerializeField] private float staminaDrainRate = 1f;        // 초당 소모량
     [SerializeField] private float staminaRegenRate = 1.5f;      // 지상 대기 중 초당 회복량
 
+    [Header("사망 및 관전 설정")]
+    public NetworkVariable<bool> isDead = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<int> deathCount = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    private int currentSpectateIndex = 0; // 현재 관전 중인 팀원 번호
+    private Transform spectateTarget;     // 관전할 대상의 위치
+
+    [Header("체력 설정")]
+    [SerializeField] private float maxHealth = 100f; // 최대 체력
+
     [Header("UI 설정")]
     [SerializeField] private GameObject playerUICanvas; // 내 화면에서만 켤 캔버스
     [SerializeField] private Slider staminaSlider;      // 스태미너 바 슬라이더
+    [SerializeField] private Slider healthSlider;       //  체력 바 슬라이더
+    [SerializeField] private Slider satietySlider;      // 포만감 바 슬라이더
 
     // 서버가 엄격하게 관리하고 클라이언트들에게 실시간 복제할 네트워크 변수들
     public NetworkVariable<float> currentStamina = new NetworkVariable<float>(20f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public NetworkVariable<bool> isFlightBlocked = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> currentHealth = new NetworkVariable<float>(100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server); // ✨ 체력 네트워크 변수
     private float blockTimer = 0f;
 
     [Header("카메라 설정")]
@@ -44,6 +57,7 @@ public class PlayerMovement : NetworkBehaviour
 
     [Header("에너지 & 상호작용 설정")]
     public NetworkVariable<int> currentEnergy = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    [SerializeField] private int maxEnergy = 100; //  최대 포만감(에너지) 제한치
     [SerializeField] private GameObject eggPrefab;
     [SerializeField] private float interactDistance = 4f; // 음식 섭취 최대 사거리
     [SerializeField] private float eatDuration = 3f; // 섭취에 걸리는 시간
@@ -77,6 +91,7 @@ public class PlayerMovement : NetworkBehaviour
         if (IsServer)
         {
             currentStamina.Value = maxFlightStamina;
+            currentHealth.Value = maxHealth; //  서버에서 체력 꽉 채워줌
         }
 
         // 내가 조종하는 내 캐릭터일 때
@@ -93,6 +108,11 @@ public class PlayerMovement : NetworkBehaviour
             {
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
             }
+            if (isDead.Value)
+            {
+                HandleSpectatorInput();
+                return; // 여기서 return 되므로 아래에 있는 HandleLook, HandleInput 등은 실행되지 않음
+            }
 
             // 내 화면의 UI와 슬라이더 기본값 초기화 세팅
             if (playerUICanvas != null) playerUICanvas.SetActive(true);
@@ -100,6 +120,16 @@ public class PlayerMovement : NetworkBehaviour
             {
                 staminaSlider.maxValue = maxFlightStamina;
                 staminaSlider.value = maxFlightStamina;
+            }
+            if (healthSlider != null) //  체력 바 최대치 설정
+            {
+                healthSlider.maxValue = maxHealth;
+                healthSlider.value = maxHealth;
+            }
+            if (satietySlider != null) // 포만감 바 최대치 설정
+            {
+                satietySlider.maxValue = maxEnergy;
+                satietySlider.value = currentEnergy.Value;
             }
         }
         else
@@ -129,6 +159,14 @@ public class PlayerMovement : NetworkBehaviour
             {
                 staminaSlider.value = currentStamina.Value;
             }
+            if (healthSlider != null) // ✨ 실시간 체력 바 갱신
+            {
+                healthSlider.value = currentHealth.Value;
+            }
+            if (satietySlider != null) // ✨ [새로 추가됨] 실시간 포만감 바 갱신
+            {
+                satietySlider.value = currentEnergy.Value;
+            }
 
             // 만약 서버에서 스태미너가 고갈되었거나 기막에 차단당했다면 클라이언트 비행 변수도 꺼줌
             if (currentStamina.Value <= 0f || isFlightBlocked.Value)
@@ -147,6 +185,12 @@ public class PlayerMovement : NetworkBehaviour
                 LayEggsServerRpc();
             }
 
+            // 체력 깎임 테스트용 단축키
+            if (Input.GetKeyDown(KeyCode.H))
+            {
+                TakeDamage(20f);
+            }
+
             animator.SetFloat("speed", horizontalSpeed); //걷는 속도 애니메이션 변수(speed)에 대입
             animator.SetFloat("speed", horizontalSpeed); //뛸 때 속도 애니메이션 변수(speed)에 대입
             animator.SetBool("flying", isFlying); //날 때 애니메이션 변수(flying)에 대입
@@ -163,14 +207,76 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (!IsOwner) return;
         SubmitMovementServerRpc(inputVelocity, isFlying);  // 클라이언트에서 계산된 이동 벡터와 비행 상태를 서버로 전송하여 물리 이동을 처리하도록 함
+
+        if (isDead.Value) return;
+
+        SubmitMovementServerRpc(inputVelocity, isFlying);
     }
 
-    // ✨ 외부 기믹(거미줄 등)이 서버에서 다이렉트로 호출할 비행 봉쇄 함수
+    // 외부 기믹(거미줄 등)이 서버에서 다이렉트로 호출할 비행 봉쇄 함수
     public void BlockFlight(float duration)
     {
         if (!IsServer) return;
         isFlightBlocked.Value = true;
         blockTimer = duration;
+    }
+
+    // 플레이어 데미지 처리 함수
+    public void TakeDamage(float damageAmount)
+    {
+        if (!IsServer) return;
+
+        currentHealth.Value = Mathf.Max(0f, currentHealth.Value - damageAmount);
+        Debug.Log($"[{gameObject.name}] 맞았습니다! 남은 체력: {currentHealth.Value}");
+
+        if (currentHealth.Value <= 0f)
+        {
+            Die();
+        }
+    }
+
+    private void Die()
+    {
+        if (isDead.Value) return; // 이미 죽었다면 무시
+
+        // 서버에서 사망 상태와 데스 카운트를 올림
+        isDead.Value = true;
+        deathCount.Value += 1;
+
+        // 모든 클라이언트(팀원들 화면 포함)에게 나를 유령으로 만들라고 명령
+        SetDeathStateClientRpc(true);
+
+        Debug.Log($"[{gameObject.name}] 파리 사망! 누적 데스: {deathCount.Value}");
+    }
+
+    [ClientRpc]
+    private void SetDeathStateClientRpc(bool deathState)
+    {
+        // 모델(Mesh) 렌더러 끄기/켜기 (투명화)
+        Renderer[] renderers = GetComponentsInChildren<Renderer>();
+        foreach (Renderer r in renderers) r.enabled = !deathState;
+
+        // 물리 충돌 무시 (벽이나 바닥, 적의 공격 통과)
+        if (deathState)
+        {
+            rb.linearVelocity = Vector3.zero; // 유령이 되기 전에 관성을 완전히 없앰
+        }
+        rb.isKinematic = deathState;
+
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = !deathState;
+
+        // 내가 조종하던 캐릭터가 죽은 거라면 화면 전환 준비
+        if (IsOwner)
+        {
+            if (playerUICanvas != null) playerUICanvas.SetActive(!deathState); // UI 가리기
+
+            if (deathState)
+            {
+                spectateTarget = this.transform; // 일단 내 시체를 비춤
+                Debug.Log("[시스템] 사망. 마우스 좌클릭으로 살아있는 팀원을 관전.");
+            }
+        }
     }
 
     private void HandleLook() // 마우스 입력을 처리하여 카메라와 플레이어의 회전을 제어하는 메서드
@@ -285,6 +391,8 @@ public class PlayerMovement : NetworkBehaviour
         // 1. [서버 권한] 거미줄/끈끈이 디버프 타이머 처리 및 비행 상태 강제 차단
         if (isFlightBlocked.Value)
         {
+            if (isDead.Value || rb.isKinematic) return;
+
             blockTimer -= Time.fixedDeltaTime;
             if (blockTimer <= 0f)
             {
@@ -400,11 +508,11 @@ public class PlayerMovement : NetworkBehaviour
         {
             if (IsOwner) DisableCurrentHighlight();
 
-            currentEnergy.Value += 10;
+            currentEnergy.Value = Mathf.Min(maxEnergy, currentEnergy.Value + 10);
 
             foodNetObj.Despawn(false); // 네트워크 해제
 
-            Debug.Log("[서버] 음식을 섭취했습니다! 에너지: " + currentEnergy.Value);
+            Debug.Log("[서버] 음식을 섭취했습니다! 에너지(포만감): " + currentEnergy.Value);
         }
     }
 
@@ -414,7 +522,7 @@ public class PlayerMovement : NetworkBehaviour
         // 서버 측에서 다시 한번 에너지가 충분한지 확인
         if (currentEnergy.Value >= 1 && eggPrefab != null)
         {
-            // 에너지 10 차감
+            // 에너지 1 차감 (포만감 감소)
             currentEnergy.Value -= 1;
 
             // 알 소환 위치 계산 (엉덩이 뒤쪽)
@@ -424,7 +532,7 @@ public class PlayerMovement : NetworkBehaviour
             GameObject newEgg = Instantiate(eggPrefab, spawnPos, Quaternion.identity);
             newEgg.GetComponent<NetworkObject>().Spawn();
 
-            Debug.Log($"[서버] 알을 1개 낳았습니다. 남은 에너지: {currentEnergy.Value}");
+            Debug.Log($"[서버] 알을 1개 낳았습니다. 남은 에너지(포만감): {currentEnergy.Value}");
         }
     }
 
@@ -460,5 +568,51 @@ public class PlayerMovement : NetworkBehaviour
     {
         isEating = false;
         eatTimer = 0f;
+    }
+    // ✨ [새로 추가됨] 관전 입력 및 카메라 이동 처리
+    private void HandleSpectatorInput()
+    {
+        // 마우스 좌클릭으로 살아있는 다른 팀원 찾기
+        if (Input.GetMouseButtonDown(0))
+        {
+            SwitchSpectateTarget();
+        }
+
+        // 내 카메라를 타겟(팀원)의 카메라 위치/회전과 완벽하게 똑같이 맞춤 (1인칭 공유)
+        if (spectateTarget != null)
+        {
+            playerCamera.transform.position = spectateTarget.position;
+            playerCamera.transform.rotation = spectateTarget.rotation;
+        }
+    }
+
+    private void SwitchSpectateTarget()
+    {
+        // 씬에 있는 모든 파리(PlayerMovement)를 찾습니다.
+        PlayerMovement[] allPlayers = FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None);
+        System.Collections.Generic.List<PlayerMovement> aliveTeammates = new System.Collections.Generic.List<PlayerMovement>();
+
+        // 나를 제외한 '살아있는' 팀원만 리스트에 담습니다.
+        foreach (var p in allPlayers)
+        {
+            if (!p.isDead.Value && p != this)
+            {
+                aliveTeammates.Add(p);
+            }
+        }
+
+        // 살아있는 팀원이 있다면 순서대로 관전 타겟을 바꿉니다.
+        if (aliveTeammates.Count > 0)
+        {
+            currentSpectateIndex = (currentSpectateIndex + 1) % aliveTeammates.Count;
+            // 팀원의 '카메라'를 타겟으로 잡아서 그 사람이 보는 시야를 그대로 봅니다.
+            spectateTarget = aliveTeammates[currentSpectateIndex].playerCamera.transform;
+        }
+        else
+        {
+            // 살아있는 팀원이 아무도 없으면 일단 내 시체 위치를 비춥니다.
+            spectateTarget = this.transform;
+            Debug.Log("살아있는 팀원이 없음... 게임 오버 대기 중.");
+        }
     }
 }
