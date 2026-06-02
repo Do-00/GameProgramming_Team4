@@ -78,40 +78,33 @@ public class PlayerMovement : NetworkBehaviour
     private Vector3 dashDirection;    // 대쉬 방향 (서버가 관리)
     private float currentDashSpeed = 0f;  // 현재 대쉬 속도 (서버가 관리)
 
-
     private void Awake()
     {
-        rb = GetComponent<Rigidbody>(); // Rigidbody 컴포넌트를 가져옴
-        animator = GetComponent<Animator>(); //Animator 컴포넌트 가져옴
+        rb = GetComponent<Rigidbody>();
+        animator = GetComponent<Animator>();
     }
 
-    public override void OnNetworkSpawn() // 네트워크에 스폰될 때 호출되는 메서드
+    public override void OnNetworkSpawn()
     {
-        // 서버라면 최초 스태미너 값을 최대치로 엄격하게 설정
         if (IsServer)
         {
             currentStamina.Value = maxFlightStamina;
-            currentHealth.Value = maxHealth; //  서버에서 체력 꽉 채워줌
+            currentHealth.Value = maxHealth;
+            transform.position = new Vector3(0f, 1001f, 0f);
         }
 
-        // 내가 조종하는 내 캐릭터일 때
         if (IsOwner)
         {
-            playerCamera.gameObject.SetActive(true);  // 플레이어 카메라 활성화
-            if (Camera.main != null) Camera.main.gameObject.SetActive(false);  // 메인 카메라가 있다면 비활성화
+            playerCamera.gameObject.SetActive(true);
+            if (Camera.main != null) Camera.main.gameObject.SetActive(false);
 
-            Cursor.lockState = CursorLockMode.Locked; // 커서를 화면 중앙에 고정
-            Cursor.visible = false;                 // 커서를 보이지 않게 설정
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
 
-            Renderer[] renderers = GetComponentsInChildren<Renderer>();   // 자신의 모델을 가져와서 그림자만 보이도록 설정 (자신은 보이지 않게)
+            Renderer[] renderers = GetComponentsInChildren<Renderer>();
             foreach (Renderer r in renderers)
             {
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
-            }
-            if (isDead.Value)
-            {
-                HandleSpectatorInput();
-                return; // 여기서 return 되므로 아래에 있는 HandleLook, HandleInput 등은 실행되지 않음
             }
 
             // 내 화면의 UI와 슬라이더 기본값 초기화 세팅
@@ -121,12 +114,12 @@ public class PlayerMovement : NetworkBehaviour
                 staminaSlider.maxValue = maxFlightStamina;
                 staminaSlider.value = maxFlightStamina;
             }
-            if (healthSlider != null) //  체력 바 최대치 설정
+            if (healthSlider != null)
             {
                 healthSlider.maxValue = maxHealth;
                 healthSlider.value = maxHealth;
             }
-            if (satietySlider != null) // 포만감 바 최대치 설정
+            if (satietySlider != null)
             {
                 satietySlider.maxValue = maxEnergy;
                 satietySlider.value = currentEnergy.Value;
@@ -134,86 +127,104 @@ public class PlayerMovement : NetworkBehaviour
         }
         else
         {
-            playerCamera.gameObject.SetActive(false);   // 다른 플레이어의 카메라는 비활성화 (자신의 카메라만 활성화)
-            if (playerCamera.GetComponent<AudioListener>() != null)  // 다른 플레이어의 카메라에 붙어있는 AudioListener도 비활성화 (자신의 오디오만 들리도록)
-                playerCamera.GetComponent<AudioListener>().enabled = false;  // 다른 플레이어의 카메라에 붙어있는 AudioListener도 비활성화 (자신의 오디오만 들리도록)
+            playerCamera.gameObject.SetActive(false);
+            if (playerCamera.GetComponent<AudioListener>() != null)
+                playerCamera.GetComponent<AudioListener>().enabled = false;
 
-            // 다른 사람 화면에서는 내 UI 캔버스를 보이지 않게 가림
             if (playerUICanvas != null) playerUICanvas.SetActive(false);
         }
     }
 
-    void Update() // 매 프레임마다 호출되는 메서드
+    void Update()
     {
         if (IsOwner)
         {
-            float horizontalSpeed = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z).magnitude; //실제 이동 속도 계산(수평)
-            if (Cursor.lockState == CursorLockMode.None)  // 일시정지 메뉴가 열려있는 동안에는 입력을 받지 않도록 함
+            float horizontalSpeed = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z).magnitude;
+
+            if (Cursor.lockState == CursorLockMode.None)
             {
-                inputVelocity = Vector3.zero;  // 이동 입력 초기화
+                inputVelocity = Vector3.zero;
                 return;
             }
 
-            // 서버가 안전하게 갱신해준 동기화 데이터를 실시간으로 UI 슬라이더에 대입
+            if (isDead.Value)
+            {
+                HandleSpectatorInput();
+                return;
+            }
+
             if (staminaSlider != null)
             {
                 staminaSlider.value = currentStamina.Value;
             }
-            if (healthSlider != null) // ✨ 실시간 체력 바 갱신
+            if (healthSlider != null)
             {
                 healthSlider.value = currentHealth.Value;
             }
-            if (satietySlider != null) // ✨ [새로 추가됨] 실시간 포만감 바 갱신
+            if (satietySlider != null)
             {
                 satietySlider.value = currentEnergy.Value;
             }
 
-            // 만약 서버에서 스태미너가 고갈되었거나 기막에 차단당했다면 클라이언트 비행 변수도 꺼줌
             if (currentStamina.Value <= 0f || isFlightBlocked.Value)
             {
                 isFlying = false;
             }
 
-            HandleLook();   // 마우스 입력을 처리하여 카메라와 플레이어의 회전을 제어하는 메서드 호출
-            HandleInput();  // 키보드와 마우스 입력을 처리하여 이동, 점프, 대쉬 등의 행동을 제어하는 메서드 호출
-            SubmitRotationServerRpc(transform.eulerAngles.y);  // 자신의 Y축 회전을 서버로 전송하여 다른 플레이어들에게도 적용되도록 함
-            HandleAimHighlight();  // 조준 중인 음식에 하이라이트를 적용하는 메서드 호출
-            HandleEatingProgress(); // 음식 섭취 진행 상황을 처리하는 메서드 호출
+            HandleLook();
+            HandleInput();
+            SubmitRotationServerRpc(transform.eulerAngles.y);
+            HandleAimHighlight();
+            HandleEatingProgress();
 
-            if (Input.GetKeyDown(KeyCode.E) && currentEnergy.Value >= 1)
+            // E 키 상호작용 (버튼 누르기 or 알 낳기)
+            if (Input.GetKeyDown(KeyCode.E))
             {
-                LayEggsServerRpc();
+                // 먼저 광선을 쏴서 시작 버튼을 바라보고 있는지 확인
+                Ray ray = playerCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+                if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
+                {
+                    if (hit.collider.CompareTag("StartButton"))
+                    {
+                        // 게임 시작 버튼을 눌렀다면 서버에 시작 명령을 내리고 리턴(알 낳기 취소)
+                        GameManager.Instance.StartGameServerRpc();
+                        return;
+                    }
+                }
+
+                // 버튼을 바라본 게 아니라면 기존처럼 에너지를 확인하고 알을 낳음
+                if (currentEnergy.Value >= 1)
+                {
+                    LayEggsServerRpc();
+                }
             }
 
-            // 체력 깎임 테스트용 단축키
             if (Input.GetKeyDown(KeyCode.H))
             {
                 TakeDamage(20f);
             }
 
-            animator.SetFloat("speed", horizontalSpeed); //걷는 속도 애니메이션 변수(speed)에 대입
-            animator.SetFloat("speed", horizontalSpeed); //뛸 때 속도 애니메이션 변수(speed)에 대입
-            animator.SetBool("flying", isFlying); //날 때 애니메이션 변수(flying)에 대입
-            animator.SetBool("dash", isDashing);  //대쉬 애니메이션 변수(dash)에 대입
+            animator.SetFloat("speed", horizontalSpeed);
+            animator.SetBool("flying", isFlying);
+            animator.SetBool("dash", isDashing);
         }
         else
         {
-            float smoothYRot = Mathf.LerpAngle(transform.eulerAngles.y, netYRot.Value, Time.deltaTime * 15f);  // 다른 플레이어의 Y축 회전을 네트워크에서 받아와서 부드럽게 보간하여 적용
+            float smoothYRot = Mathf.LerpAngle(transform.eulerAngles.y, netYRot.Value, Time.deltaTime * 15f);
             transform.rotation = Quaternion.Euler(0f, smoothYRot, 0f);
         }
     }
 
-    void FixedUpdate() // 물리 업데이트마다 호출되는 메서드
+    void FixedUpdate()
     {
         if (!IsOwner) return;
-        SubmitMovementServerRpc(inputVelocity, isFlying);  // 클라이언트에서 계산된 이동 벡터와 비행 상태를 서버로 전송하여 물리 이동을 처리하도록 함
 
+        // ✨ [수정됨 1번] 중복 호출을 제거하고, 죽었을 때 물리 이동 명령을 보내지 않도록 수정!
         if (isDead.Value) return;
 
         SubmitMovementServerRpc(inputVelocity, isFlying);
     }
 
-    // 외부 기믹(거미줄 등)이 서버에서 다이렉트로 호출할 비행 봉쇄 함수
     public void BlockFlight(float duration)
     {
         if (!IsServer) return;
@@ -221,7 +232,6 @@ public class PlayerMovement : NetworkBehaviour
         blockTimer = duration;
     }
 
-    // 플레이어 데미지 처리 함수
     public void TakeDamage(float damageAmount)
     {
         if (!IsServer) return;
@@ -237,13 +247,11 @@ public class PlayerMovement : NetworkBehaviour
 
     private void Die()
     {
-        if (isDead.Value) return; // 이미 죽었다면 무시
+        if (isDead.Value) return;
 
-        // 서버에서 사망 상태와 데스 카운트를 올림
         isDead.Value = true;
         deathCount.Value += 1;
 
-        // 모든 클라이언트(팀원들 화면 포함)에게 나를 유령으로 만들라고 명령
         SetDeathStateClientRpc(true);
 
         Debug.Log($"[{gameObject.name}] 파리 사망! 누적 데스: {deathCount.Value}");
@@ -252,50 +260,46 @@ public class PlayerMovement : NetworkBehaviour
     [ClientRpc]
     private void SetDeathStateClientRpc(bool deathState)
     {
-        // 모델(Mesh) 렌더러 끄기/켜기 (투명화)
         Renderer[] renderers = GetComponentsInChildren<Renderer>();
         foreach (Renderer r in renderers) r.enabled = !deathState;
 
-        // 물리 충돌 무시 (벽이나 바닥, 적의 공격 통과)
         if (deathState)
         {
-            rb.linearVelocity = Vector3.zero; // 유령이 되기 전에 관성을 완전히 없앰
+            rb.linearVelocity = Vector3.zero;
         }
         rb.isKinematic = deathState;
 
         Collider col = GetComponent<Collider>();
         if (col != null) col.enabled = !deathState;
 
-        // 내가 조종하던 캐릭터가 죽은 거라면 화면 전환 준비
         if (IsOwner)
         {
-            if (playerUICanvas != null) playerUICanvas.SetActive(!deathState); // UI 가리기
+            if (playerUICanvas != null) playerUICanvas.SetActive(!deathState);
 
             if (deathState)
             {
-                spectateTarget = this.transform; // 일단 내 시체를 비춤
+                spectateTarget = this.transform;
                 Debug.Log("[시스템] 사망. 마우스 좌클릭으로 살아있는 팀원을 관전.");
             }
         }
     }
 
-    private void HandleLook() // 마우스 입력을 처리하여 카메라와 플레이어의 회전을 제어하는 메서드
+    private void HandleLook()
     {
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;  // 마우스 X축 입력을 감지하여 플레이어의 Y축 회전에 적용할 회전값 계산
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;  // 마우스 Y축 입력을 감지하여 카메라의 X축 회전에 적용할 회전값 계산
+        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
+        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
 
-        xRotation -= mouseY;  // 마우스 Y축 입력을 카메라의 X축 회전에 적용 (위아래 회전)
-        xRotation = Mathf.Clamp(xRotation, -90f, 90f);  // 카메라의 X축 회전값을 -90도에서 90도로 제한하여 머리가 뒤로 넘어가지 않도록 함
-        playerCamera.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);  // 카메라의 로컬 회전을 X축 회전값으로 설정하여 카메라가 플레이어의 머리 위치에서 위아래로 회전하도록 함
+        xRotation -= mouseY;
+        xRotation = Mathf.Clamp(xRotation, -90f, 90f);
+        playerCamera.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
 
-        transform.Rotate(Vector3.up * mouseX);  // 플레이어의 Y축 회전에 마우스 X축 입력을 적용하여 좌우 회전하도록 함
+        transform.Rotate(Vector3.up * mouseX);
     }
 
-    private void HandleInput() // 키보드와 마우스 입력을 처리하여 이동, 점프, 대쉬 등의 행동을 제어하는 메서드
+    private void HandleInput()
     {
         if (Input.GetKeyDown(KeyCode.R))
         {
-            // 스태미너가 확실하게 남아있고, 봉쇄 상태가 아닐 때만 비행 모드 진입 가능
             if (!isFlying && currentStamina.Value > 0f && !isFlightBlocked.Value)
             {
                 isFlying = true;
@@ -311,9 +315,7 @@ public class PlayerMovement : NetworkBehaviour
         if (isDashing)
         {
             dashTimer -= Time.deltaTime;
-
             animator.SetBool("dash", isDashing);
-
             if (dashTimer <= 0f) isDashing = false;
         }
 
@@ -374,25 +376,25 @@ public class PlayerMovement : NetworkBehaviour
         }
     }
 
-    private bool IsGrounded() // 플레이어가 지면에 닿아있는지 확인하는 메서드
+    private bool IsGrounded()
     {
         return Physics.Raycast(transform.position, Vector3.down, groundCheckDistance);
     }
 
     [ServerRpc]
-    private void SubmitJumpServerRpc() // 클라이언트에서 점프 입력이 발생했을 때 서버로 점프 명령을 전송하는 메서드
+    private void SubmitJumpServerRpc()
     {
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, jumpForce, rb.linearVelocity.z);
     }
 
     [ServerRpc]
-    private void SubmitMovementServerRpc(Vector3 velocity, bool flyingState) // 클라이언트에서 입력된 이동 벡터와 비행 상태를 서버로 전송하는 메서드
+    private void SubmitMovementServerRpc(Vector3 velocity, bool flyingState)
     {
-        // 1. [서버 권한] 거미줄/끈끈이 디버프 타이머 처리 및 비행 상태 강제 차단
+        // ✨ [수정됨 2번] 방어막을 밖으로 꺼내서 가장 윗줄에 배치하여 완벽하게 방어!
+        if (isDead.Value || rb.isKinematic) return;
+
         if (isFlightBlocked.Value)
         {
-            if (isDead.Value || rb.isKinematic) return;
-
             blockTimer -= Time.fixedDeltaTime;
             if (blockTimer <= 0f)
             {
@@ -401,16 +403,15 @@ public class PlayerMovement : NetworkBehaviour
             flyingState = false;
         }
 
-        // 2. [서버 권한] 비행 여부에 따른 실시간 스태미너 가감산 처리
         if (flyingState)
         {
             currentStamina.Value = Mathf.Max(0f, currentStamina.Value - (staminaDrainRate * Time.fixedDeltaTime));
             if (currentStamina.Value <= 0f)
             {
-                flyingState = false; // 스태미너 소모 완료 시 비행 권한 해제하여 추락 유도
+                flyingState = false;
             }
         }
-        else if (Physics.Raycast(transform.position, Vector3.down, groundCheckDistance)) // 서버 측에서 정확한 지면 판단
+        else if (Physics.Raycast(transform.position, Vector3.down, groundCheckDistance))
         {
             if (currentStamina.Value < maxFlightStamina)
             {
@@ -418,7 +419,6 @@ public class PlayerMovement : NetworkBehaviour
             }
         }
 
-        // 3. 기존의 핵심 물리 계산 처리
         if (rb.useGravity == flyingState)
         {
             rb.useGravity = !flyingState;
@@ -446,10 +446,11 @@ public class PlayerMovement : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void SubmitRotationServerRpc(float yRot) // 클라이언트에서 입력된 Y축 회전값을 서버로 전송하는 메서드
+    private void SubmitRotationServerRpc(float yRot)
     {
         netYRot.Value = yRot;
     }
+
     private void HandleAimHighlight()
     {
         Ray ray = playerCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
@@ -462,9 +463,9 @@ public class PlayerMovement : NetworkBehaviour
 
                 if (foodOutline != null && foodOutline != currentlyHighlightedFood)
                 {
-                    DisableCurrentHighlight(); // 이전 하이라이트 끄기
+                    DisableCurrentHighlight();
                     currentlyHighlightedFood = foodOutline;
-                    currentlyHighlightedFood.enabled = true; // 새로운 하이라이트 켜기
+                    currentlyHighlightedFood.enabled = true;
                 }
                 return;
             }
@@ -481,17 +482,15 @@ public class PlayerMovement : NetworkBehaviour
             currentlyHighlightedFood = null;
         }
     }
+
     private void TryEatFood()
     {
         Ray ray = playerCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
 
-        // 광선을 쏴서 interactDistance(사거리) 안에 무언가 맞았는지 확인
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
         {
-            // 맞은 물체의 태그가 Food라면
             if (hit.collider.CompareTag("Food"))
             {
-                // 맞은 물체의 네트워크 오브젝트 정보를 가져와 서버로 보냄
                 NetworkObject foodNetObj = hit.collider.GetComponent<NetworkObject>();
                 if (foodNetObj != null)
                 {
@@ -509,8 +508,7 @@ public class PlayerMovement : NetworkBehaviour
             if (IsOwner) DisableCurrentHighlight();
 
             currentEnergy.Value = Mathf.Min(maxEnergy, currentEnergy.Value + 10);
-
-            foodNetObj.Despawn(false); // 네트워크 해제
+            foodNetObj.Despawn(false);
 
             Debug.Log("[서버] 음식을 섭취했습니다! 에너지(포만감): " + currentEnergy.Value);
         }
@@ -519,16 +517,10 @@ public class PlayerMovement : NetworkBehaviour
     [ServerRpc]
     private void LayEggsServerRpc()
     {
-        // 서버 측에서 다시 한번 에너지가 충분한지 확인
         if (currentEnergy.Value >= 1 && eggPrefab != null)
         {
-            // 에너지 1 차감 (포만감 감소)
             currentEnergy.Value -= 1;
-
-            // 알 소환 위치 계산 (엉덩이 뒤쪽)
             Vector3 spawnPos = transform.position - transform.forward * 0.5f + Vector3.up * 0.2f + Random.insideUnitSphere * 0.1f;
-
-            // 알 생성 및 네트워크 스폰
             GameObject newEgg = Instantiate(eggPrefab, spawnPos, Quaternion.identity);
             newEgg.GetComponent<NetworkObject>().Spawn();
 
@@ -538,13 +530,11 @@ public class PlayerMovement : NetworkBehaviour
 
     private void HandleEatingProgress()
     {
-        // F키를 꾹 누르고 있고 + 조준 중인 음식이 있다면
         if (Input.GetKey(KeyCode.F) && currentlyHighlightedFood != null)
         {
             isEating = true;
-            eatTimer += Time.deltaTime; // 시간 누적
+            eatTimer += Time.deltaTime;
 
-            // 3초가 다 되었다면 섭취 완료
             if (eatTimer >= eatDuration)
             {
                 NetworkObject foodNetObj = currentlyHighlightedFood.GetComponent<NetworkObject>();
@@ -552,33 +542,28 @@ public class PlayerMovement : NetworkBehaviour
                 {
                     EatFoodServerRpc(foodNetObj);
                 }
-                ResetEating(); // 먹었으니 타이머 초기화
+                ResetEating();
             }
-
-            // 테스트용 콘솔 출력
-            Debug.Log($"음식 섭취 중... ({(eatTimer / eatDuration) * 100:F0}%)");
         }
         else
         {
-            // 키를 떼거나 에임이 빗나가면 초기화
             if (isEating) ResetEating();
         }
     }
+
     private void ResetEating()
     {
         isEating = false;
         eatTimer = 0f;
     }
-    // ✨ [새로 추가됨] 관전 입력 및 카메라 이동 처리
+
     private void HandleSpectatorInput()
     {
-        // 마우스 좌클릭으로 살아있는 다른 팀원 찾기
         if (Input.GetMouseButtonDown(0))
         {
             SwitchSpectateTarget();
         }
 
-        // 내 카메라를 타겟(팀원)의 카메라 위치/회전과 완벽하게 똑같이 맞춤 (1인칭 공유)
         if (spectateTarget != null)
         {
             playerCamera.transform.position = spectateTarget.position;
@@ -588,11 +573,9 @@ public class PlayerMovement : NetworkBehaviour
 
     private void SwitchSpectateTarget()
     {
-        // 씬에 있는 모든 파리(PlayerMovement)를 찾습니다.
         PlayerMovement[] allPlayers = FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None);
         System.Collections.Generic.List<PlayerMovement> aliveTeammates = new System.Collections.Generic.List<PlayerMovement>();
 
-        // 나를 제외한 '살아있는' 팀원만 리스트에 담습니다.
         foreach (var p in allPlayers)
         {
             if (!p.isDead.Value && p != this)
@@ -601,18 +584,27 @@ public class PlayerMovement : NetworkBehaviour
             }
         }
 
-        // 살아있는 팀원이 있다면 순서대로 관전 타겟을 바꿉니다.
         if (aliveTeammates.Count > 0)
         {
             currentSpectateIndex = (currentSpectateIndex + 1) % aliveTeammates.Count;
-            // 팀원의 '카메라'를 타겟으로 잡아서 그 사람이 보는 시야를 그대로 봅니다.
             spectateTarget = aliveTeammates[currentSpectateIndex].playerCamera.transform;
         }
         else
         {
-            // 살아있는 팀원이 아무도 없으면 일단 내 시체 위치를 비춥니다.
             spectateTarget = this.transform;
             Debug.Log("살아있는 팀원이 없음... 게임 오버 대기 중.");
         }
+    }
+    [ClientRpc]
+    public void TeleportClientRpc(Vector3 targetPosition)
+    {
+        // 물리 엔진(Rigidbody)이 켜져 있으면 강제 이동 시 튕겨 나갈 수 있으므로 잠깐 끕니다.
+        rb.isKinematic = true;
+
+        // 바닥에 파고들지 않도록 Y축으로 살짝 위(예: 1.5f)로 띄워서 텔레포트
+        transform.position = targetPosition + Vector3.up * 1.5f;
+
+        // 이동 완료 후 다시 물리 엔진 가동
+        rb.isKinematic = false;
     }
 }

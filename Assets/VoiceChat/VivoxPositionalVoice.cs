@@ -28,12 +28,18 @@ public class VivoxPositionalVoice : NetworkBehaviour
         {
             try
             {
+                // ? [핵심 추가] Vivox(또는 유니티 인증) 로그인이 완전히 끝날 때까지 얌전히 대기합니다!
+                while (!Unity.Services.Authentication.AuthenticationService.Instance.IsSignedIn)
+                {
+                    await Task.Delay(100);
+                }
+
                 if (isEchoTestMode)
                 {
                     myJoinedChannel = "EchoTestRoom";
                     await VivoxService.Instance.JoinEchoChannelAsync(myJoinedChannel, ChatCapability.AudioOnly);
-
                     isChannelJoined = true;
+                    Debug.Log("[Vivox] ?? 에코 테스트 모드 입장 완료");
                 }
                 else
                 {
@@ -48,7 +54,7 @@ public class VivoxPositionalVoice : NetworkBehaviour
                     await VivoxService.Instance.JoinPositionalChannelAsync(myJoinedChannel, ChatCapability.AudioOnly, properties);
 
                     isChannelJoined = true;
-                    Debug.Log($"[Vivox] ?? {myJoinedChannel} 방에 3D 음성으로 입장");
+                    Debug.Log($"[Vivox] ?? {myJoinedChannel} 방에 3D 음성으로 입장 완료");
                 }
             }
             catch (System.Exception e)

@@ -5,6 +5,7 @@ TagManager:
   serializedVersion: 3
   tags:
   - Food
+  - StartButton
   layers:
   - Default
   - TransparentFX
@@ -15,7 +16,7 @@ TagManager:
   - Wall
   - Monster
   - Sensor
-  - 
+  - StartButton
   - 
   - 
   - 
