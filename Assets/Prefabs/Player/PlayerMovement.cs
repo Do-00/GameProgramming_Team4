@@ -13,7 +13,7 @@ public class PlayerMovement : NetworkBehaviour
 
     [Header("점프 & 대쉬 설정")]
     [SerializeField] private float jumpForce = 15f;     // 점프 거리
-    [SerializeField] private float fallMultiplier = 4f; // 낙하 가속도                -------- 새로 추가함
+    [SerializeField] private float fallMultiplier = 4f; // 낙하 가속도                   -------- 새로 추가함
     [SerializeField] private float upwardMultiplier = 2.5f;  // 상승 가속도                -------- 새로 추가함
     [SerializeField] private float dashSpeed = 40f;    // 대쉬 속도
     [SerializeField] private float groundDashDuration = 0.2f; // 지상 대쉬 지속 시간
@@ -21,33 +21,6 @@ public class PlayerMovement : NetworkBehaviour
     [SerializeField] private float dashCooldown = 1.5f;  // 대쉬 쿨타임
     [SerializeField] private float dashFriction = 5f;  // 대쉬 감속 속도
     [SerializeField] private float groundCheckDistance = 1.1f; // 지면 체크 거리
-
-    [Header("비행 스태미너 설정")]
-    [SerializeField] private float maxFlightStamina = 20f;       // 최대 비행 시간
-    [SerializeField] private float staminaDrainRate = 1f;        // 초당 소모량
-    [SerializeField] private float staminaRegenRate = 1.5f;      // 지상 대기 중 초당 회복량
-
-    [Header("사망 및 관전 설정")]
-    public NetworkVariable<bool> isDead = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    public NetworkVariable<int> deathCount = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-
-    private int currentSpectateIndex = 0; // 현재 관전 중인 팀원 번호
-    private Transform spectateTarget;     // 관전할 대상의 위치
-
-    [Header("체력 설정")]
-    [SerializeField] private float maxHealth = 100f; // 최대 체력
-
-    [Header("UI 설정")]
-    [SerializeField] private GameObject playerUICanvas; // 내 화면에서만 켤 캔버스
-    [SerializeField] private Slider staminaSlider;      // 스태미너 바 슬라이더
-    [SerializeField] private Slider healthSlider;       //  체력 바 슬라이더
-    [SerializeField] private Slider satietySlider;      // 포만감 바 슬라이더
-
-    // 서버가 엄격하게 관리하고 클라이언트들에게 실시간 복제할 네트워크 변수들
-    public NetworkVariable<float> currentStamina = new NetworkVariable<float>(20f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    public NetworkVariable<bool> isFlightBlocked = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    public NetworkVariable<float> currentHealth = new NetworkVariable<float>(100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server); // ✨ 체력 네트워크 변수
-    private float blockTimer = 0f;
 
     [Header("카메라 설정")]
     [SerializeField] private Camera playerCamera;
@@ -57,7 +30,6 @@ public class PlayerMovement : NetworkBehaviour
 
     [Header("에너지 & 상호작용 설정")]
     public NetworkVariable<int> currentEnergy = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    [SerializeField] private int maxEnergy = 100; //  최대 포만감(에너지) 제한치
     [SerializeField] private GameObject eggPrefab;
     [SerializeField] private float interactDistance = 4f; // 음식 섭취 최대 사거리
     [SerializeField] private float eatDuration = 3f; // 섭취에 걸리는 시간
@@ -78,14 +50,21 @@ public class PlayerMovement : NetworkBehaviour
     private Vector3 dashDirection;    // 대쉬 방향 (서버가 관리)
     private float currentDashSpeed = 0f;  // 현재 대쉬 속도 (서버가 관리)
 
+
+    private PlayerSkill playerSkill;
+
+
     private void Awake()
     {
-        rb = GetComponent<Rigidbody>();
-        animator = GetComponent<Animator>();
+        rb = GetComponent<Rigidbody>(); // Rigidbody 컴포넌트를 가져옴
+        animator = GetComponent<Animator>(); //Animator 컴포넌트 가져옴
+        playerSkill = GetComponent<PlayerSkill>();
+
     }
 
     public override void OnNetworkSpawn()
     {
+
         if (IsServer)
         {
             currentStamina.Value = maxFlightStamina;
@@ -98,6 +77,7 @@ public class PlayerMovement : NetworkBehaviour
             playerCamera.gameObject.SetActive(true);
             if (Camera.main != null) Camera.main.gameObject.SetActive(false);
 
+
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
 
@@ -106,6 +86,7 @@ public class PlayerMovement : NetworkBehaviour
             {
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
             }
+
 
             // 내 화면의 UI와 슬라이더 기본값 초기화 세팅
             if (playerUICanvas != null) playerUICanvas.SetActive(true);
@@ -124,6 +105,7 @@ public class PlayerMovement : NetworkBehaviour
                 satietySlider.maxValue = maxEnergy;
                 satietySlider.value = currentEnergy.Value;
             }
+
         }
         else
         {
@@ -131,7 +113,9 @@ public class PlayerMovement : NetworkBehaviour
             if (playerCamera.GetComponent<AudioListener>() != null)
                 playerCamera.GetComponent<AudioListener>().enabled = false;
 
+
             if (playerUICanvas != null) playerUICanvas.SetActive(false);
+
         }
     }
 
@@ -152,6 +136,7 @@ public class PlayerMovement : NetworkBehaviour
                 HandleSpectatorInput();
                 return;
             }
+
 
             if (staminaSlider != null)
             {
@@ -176,6 +161,7 @@ public class PlayerMovement : NetworkBehaviour
             SubmitRotationServerRpc(transform.eulerAngles.y);
             HandleAimHighlight();
             HandleEatingProgress();
+
 
             // E 키 상호작용 (버튼 누르기 or 알 낳기)
             if (Input.GetKeyDown(KeyCode.E))
@@ -207,6 +193,7 @@ public class PlayerMovement : NetworkBehaviour
             animator.SetFloat("speed", horizontalSpeed);
             animator.SetBool("flying", isFlying);
             animator.SetBool("dash", isDashing);
+
         }
         else
         {
@@ -219,7 +206,7 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (!IsOwner) return;
 
-        // ✨ [수정됨 1번] 중복 호출을 제거하고, 죽었을 때 물리 이동 명령을 보내지 않도록 수정!
+        // [수정됨 1번] 중복 호출을 제거하고, 죽었을 때 물리 이동 명령을 보내지 않도록 수정!
         if (isDead.Value) return;
 
         SubmitMovementServerRpc(inputVelocity, isFlying);
@@ -282,6 +269,7 @@ public class PlayerMovement : NetworkBehaviour
                 Debug.Log("[시스템] 사망. 마우스 좌클릭으로 살아있는 팀원을 관전.");
             }
         }
+
     }
 
     private void HandleLook()
@@ -309,6 +297,7 @@ public class PlayerMovement : NetworkBehaviour
                 isFlying = false;
             }
 
+
             animator.SetBool("flying", isFlying);
         }
 
@@ -325,10 +314,14 @@ public class PlayerMovement : NetworkBehaviour
             nextDashTime = Time.time + dashCooldown;
             currentDashSpeed = dashSpeed;
 
+
+
+
             if (isFlying)
             {
                 dashDirection = playerCamera.transform.forward;
                 dashTimer = flyDashDuration;
+
             }
             else
             {
@@ -390,7 +383,7 @@ public class PlayerMovement : NetworkBehaviour
     [ServerRpc]
     private void SubmitMovementServerRpc(Vector3 velocity, bool flyingState)
     {
-        // ✨ [수정됨 2번] 방어막을 밖으로 꺼내서 가장 윗줄에 배치하여 완벽하게 방어!
+        // [수정됨 2번] 방어막을 밖으로 꺼내서 가장 윗줄에 배치하여 완벽하게 방어!
         if (isDead.Value || rb.isKinematic) return;
 
         if (isFlightBlocked.Value)
@@ -419,6 +412,7 @@ public class PlayerMovement : NetworkBehaviour
             }
         }
 
+
         if (rb.useGravity == flyingState)
         {
             rb.useGravity = !flyingState;
@@ -426,13 +420,15 @@ public class PlayerMovement : NetworkBehaviour
             else rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         }
 
+        float mult = (playerSkill != null) ? playerSkill.speedMultiplier.Value : 1f;
+
         if (flyingState)
         {
-            rb.linearVelocity = velocity;
+            rb.linearVelocity = velocity * mult;
         }
         else
         {
-            rb.linearVelocity = new Vector3(velocity.x, rb.linearVelocity.y, velocity.z);
+            rb.linearVelocity = new Vector3(velocity.x * mult, rb.linearVelocity.y, velocity.z * mult);
 
             if (rb.linearVelocity.y < 0)
             {
@@ -507,10 +503,12 @@ public class PlayerMovement : NetworkBehaviour
         {
             if (IsOwner) DisableCurrentHighlight();
 
+
             currentEnergy.Value = Mathf.Min(maxEnergy, currentEnergy.Value + 10);
             foodNetObj.Despawn(false);
 
-            Debug.Log("[서버] 음식을 섭취했습니다! 에너지(포만감): " + currentEnergy.Value);
+
+            Debug.Log("[서버] 음식을 섭취했습니다! 에너지: " + currentEnergy.Value);
         }
     }
 
@@ -519,12 +517,13 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (currentEnergy.Value >= 1 && eggPrefab != null)
         {
+
             currentEnergy.Value -= 1;
             Vector3 spawnPos = transform.position - transform.forward * 0.5f + Vector3.up * 0.2f + Random.insideUnitSphere * 0.1f;
             GameObject newEgg = Instantiate(eggPrefab, spawnPos, Quaternion.identity);
             newEgg.GetComponent<NetworkObject>().Spawn();
 
-            Debug.Log($"[서버] 알을 1개 낳았습니다. 남은 에너지(포만감): {currentEnergy.Value}");
+            Debug.Log($"[서버] 알을 1개 낳았습니다. 남은 에너지: {currentEnergy.Value}");
         }
     }
 
@@ -607,4 +606,5 @@ public class PlayerMovement : NetworkBehaviour
         // 이동 완료 후 다시 물리 엔진 가동
         rb.isKinematic = false;
     }
+
 }

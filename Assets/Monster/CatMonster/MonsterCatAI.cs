@@ -34,11 +34,6 @@ public class MonsterCatAI : NetworkBehaviour
     [SerializeField] private float jumpGravityMultiplier = 3f;
     [SerializeField] private float jumpOvershootRatio = 0.2f;
 
-    // ✨ [새로 추가됨] 공격 데미지 설정
-    [Header("공격 데미지 설정")]
-    [SerializeField] private float dashDamage = 80f;     // 지상 관통 돌진 시 큰 데미지
-    [SerializeField] private float airJumpDamage = 40f;  // 공중 점프 관통 시 약한 데미지
-
     [Header("충돌 및 기절 설정")]
     [SerializeField] private float stunDuration = 5f;
     [SerializeField] private LayerMask obstacleLayer;
@@ -230,29 +225,6 @@ public class MonsterCatAI : NetworkBehaviour
                 rb.linearVelocity = Vector3.zero;
                 currentState.Value = CatState.Stunned;
                 Debug.Log("[서버 고양이] 장애물에 충돌하여 기절합니다!");
-            }
-        }
-    }
-
-    // ✨ [새로 추가됨] 플레이어 관통 시 데미지를 주는 트리거 이벤트
-    private void OnTriggerEnter(Collider other)
-    {
-        // 💥 데미지 판정은 서버에서만 처리합니다.
-        if (!IsServer) return;
-
-        // 고양이가 돌진(Charging) 상태일 때만 데미지가 들어갑니다.
-        if (currentState.Value == CatState.Charging && other.CompareTag("Player"))
-        {
-            PlayerMovement player = other.GetComponent<PlayerMovement>();
-
-            // 플레이어가 살아있을 때만 타격
-            if (player != null && player.currentHealth.Value > 0)
-            {
-                // 점프 중인지 지상인지 확인하여 데미지 결정
-                float currentDamage = isJumpingAttack ? airJumpDamage : dashDamage;
-
-                player.TakeDamage(currentDamage);
-                Debug.Log($"[서버 고양이] 관통 공격 성공! 데미지: {currentDamage} (점프 공격: {isJumpingAttack})");
             }
         }
     }

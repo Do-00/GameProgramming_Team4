@@ -139,15 +139,6 @@ public class SpiderWeb : NetworkBehaviour
 
         if (other.CompareTag("Player") && ownerSpider != null)
         {
-            // 플레이어의 비행 스태미너 차단
-            PlayerMovement player = other.GetComponent<PlayerMovement>();
-            if (player != null)
-            {
-                // 5초 동안 비행 봉쇄 및 즉시 추락 
-                player.BlockFlight(5f);
-                Debug.Log($"[{other.name}] 거미줄에 걸려 비행이 차단되었습니다!");
-            }
-
             ownerSpider.AlertByWeb(other.transform);
             DespawnWeb();
         }
