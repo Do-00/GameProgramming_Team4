@@ -198,7 +198,7 @@ public class PlayerMovement : NetworkBehaviour
                 // 버튼을 바라본 게 아니라면 기존처럼 에너지를 확인하고 알을 낳음
                 if (currentEnergy.Value >= 1)
                 {
-                    LayEggsServerRpc();
+                    LayEggsServerRpc(ShelterZone.IsLocalPlayerInShelter);
                 }
             }
 
@@ -512,16 +512,29 @@ public class PlayerMovement : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void LayEggsServerRpc()
+    private void LayEggsServerRpc(bool isInShelter)
     {
-        if (currentEnergy.Value >= 1 && eggPrefab != null)
+        if (currentEnergy.Value < 1 || eggPrefab == null)
         {
-            currentEnergy.Value -= 1;
-            Vector3 spawnPos = transform.position - transform.forward * 0.5f + Vector3.up * 0.2f + Random.insideUnitSphere * 0.1f;
+            Debug.Log($"[서버] 에너지 부족 | 에너지: {currentEnergy.Value}");
+            return;
+        }
+        currentEnergy.Value -= 1;
+
+        if (isInShelter)
+        {
+            // 화폐 알 — 스폰 없이 카운트만
+            GameManager.Instance.sharedEggCount.Value += 1;
+            Debug.Log($"[서버] 쉘터 알(화폐) +1 | 총: {GameManager.Instance.sharedEggCount.Value} | 에너지: {currentEnergy.Value}");
+        }
+        else
+        {
+            // 일반 알 — 월드에 스폰
+            Vector3 spawnPos = transform.position - transform.forward * 0.5f
+                + Vector3.up * 0.2f + Random.insideUnitSphere * 0.1f;
             GameObject newEgg = Instantiate(eggPrefab, spawnPos, Quaternion.identity);
             newEgg.GetComponent<NetworkObject>().Spawn();
-
-            Debug.Log($"[서버] 알을 1개 낳았습니다. 남은 에너지(포만감): {currentEnergy.Value}");
+            Debug.Log($"[서버] 일반 알 스폰 | 에너지: {currentEnergy.Value}");
         }
     }
 

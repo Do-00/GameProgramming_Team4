@@ -929,11 +929,11 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 2
   windowsGamepadBackendHint: 0
-  cloudProjectId: 9e52b7ec-a287-4b00-97de-102c9059d151
+  cloudProjectId: 4a32c387-3853-4040-b635-f020ae5a05f8
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
   projectName: Multiplay Test With Unity
-  organizationId: dddong1
+  organizationId: uglydov
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}

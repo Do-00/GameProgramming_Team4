@@ -3,6 +3,9 @@ using UnityEngine;
 
 public class GameManager : NetworkBehaviour
 {
+    public NetworkVariable<int> sharedEggCount = new NetworkVariable<int>(
+    0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     public static GameManager Instance; // 어디서든 쉽게 접근할 수 있도록 싱글톤 패턴 적용
 
     [HideInInspector]
