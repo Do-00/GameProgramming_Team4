@@ -4,32 +4,32 @@ using UnityEngine;
 public class GameManager : NetworkBehaviour
 {
     public NetworkVariable<int> sharedEggCount = new NetworkVariable<int>(
-    0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    public static GameManager Instance; // ¾îµð¼­µç ½±°Ô Á¢±ÙÇÒ ¼ö ÀÖµµ·Ï ½Ì±ÛÅæ ÆÐÅÏ Àû¿ë
+    public static GameManager Instance; // ï¿½ï¿½ð¼­µï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Öµï¿½ï¿½ï¿½ ï¿½Ì±ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
     [HideInInspector]
-    public Vector3 startRoomPosition; // ¸Ê »ý¼º±â°¡ ¾Ë·ÁÁÙ ½ÃÀÛ ¹æÀÇ ÁÂÇ¥
+    public Vector3 startRoomPosition; // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½â°¡ ï¿½Ë·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥
 
     private void Awake()
     {
-        // ¾À¿¡ GameManager°¡ ´Ü ÇÏ³ª¸¸ Á¸ÀçÇÏµµ·Ï À¯Áö
+        // ï¿½ï¿½ï¿½ï¿½ GameManagerï¿½ï¿½ ï¿½ï¿½ ï¿½Ï³ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
     }
 
-    // ¾Æ¹«³ª ¹öÆ°À» ´©¸£¸é ¼­¹ö°¡ ÀÌ ÇÔ¼ö¸¦ ½ÇÇàÇÏ¿© ¸ðµç ÇÃ·¹ÀÌ¾î¸¦ ÀÌµ¿½ÃÅ´
+    // ï¿½Æ¹ï¿½ï¿½ï¿½ ï¿½ï¿½Æ°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾î¸¦ ï¿½Ìµï¿½ï¿½ï¿½Å´
     [ServerRpc(RequireOwnership = false)]
     public void StartGameServerRpc()
     {
-        Debug.Log("[½Ã½ºÅÛ] °ÔÀÓ ½ÃÀÛ! ¸ðµç ÆÄ¸®¸¦ Áö»óÀ¸·Î °­ÇÏÇÕ´Ï´Ù.");
+        Debug.Log("[ï¿½Ã½ï¿½ï¿½ï¿½] ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½! ï¿½ï¿½ï¿½ ï¿½Ä¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.");
 
-        // ¾À¿¡ ÀÖ´Â ¸ðµç ÆÄ¸®(PlayerMovement)¸¦ Ã£À½
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½ ï¿½Ä¸ï¿½(PlayerMovement)ï¿½ï¿½ Ã£ï¿½ï¿½
         PlayerMovement[] allPlayers = FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None);
 
         foreach (PlayerMovement player in allPlayers)
         {
-            // °¢ ÆÄ¸®µéÀÇ Å¬¶óÀÌ¾ðÆ® È­¸é¿¡ ÅÚ·¹Æ÷Æ® ¸í·ÉÀ» ³»¸²
+            // ï¿½ï¿½ ï¿½Ä¸ï¿½ï¿½ï¿½ï¿½ï¿½ Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ® È­ï¿½é¿¡ ï¿½Ú·ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             player.TeleportClientRpc(startRoomPosition);
         }
     }

@@ -136,16 +136,17 @@ public class SkillShopManager : MonoBehaviour
     private void SetupSkillCard(SkillData data)
     {
         GameObject card = Instantiate(skillCardPrefab, skillListContent);
+        Transform root = card.transform.Find("SkillCard") ?? card.transform;
 
         bool isUnlocked = localPlayerSkill.IsUnlocked(data.skillType);
         int currentLevel = localPlayerSkill.GetUpgradeLevel(data.skillType);
         bool isMaxLevel = data.upgrades == null || currentLevel >= data.upgrades.Length;
 
         // ── 텍스트 ──
-        card.transform.Find("SkillName").GetComponent<TextMeshProUGUI>().text = data.skillName;
-        card.transform.Find("Description").GetComponent<TextMeshProUGUI>().text = data.description;
+        root.Find("SkillName").GetComponent<TextMeshProUGUI>().text = data.skillName;
+        root.Find("Description").GetComponent<TextMeshProUGUI>().text = data.description;
 
-        var statusText = card.transform.Find("Status").GetComponent<TextMeshProUGUI>();
+        var statusText = root.Find("Status").GetComponent<TextMeshProUGUI>();
         if (!isUnlocked)
             statusText.text = $"미해금  |  구매 비용: {data.unlockCost} 알";
         else if (isMaxLevel)
@@ -154,7 +155,7 @@ public class SkillShopManager : MonoBehaviour
             statusText.text = $"해금됨  |  Lv.{currentLevel}  |  강화 비용: {data.upgrades[currentLevel].cost} 알";
 
         // ── 구매 버튼 (미해금일 때만 표시) ──
-        var buyBtn = card.transform.Find("BuyButton").GetComponent<Button>();
+        var buyBtn = root.Find("BuyButton").GetComponent<Button>();
         buyBtn.gameObject.SetActive(!isUnlocked);
         buyBtn.onClick.AddListener(() =>
         {
@@ -163,7 +164,7 @@ public class SkillShopManager : MonoBehaviour
         });
 
         // ── 강화 버튼 (해금 + 최대 레벨 아닐 때만 표시) ──
-        var upgradeBtn = card.transform.Find("UpgradeButton").GetComponent<Button>();
+        var upgradeBtn = root.Find("UpgradeButton").GetComponent<Button>();
         upgradeBtn.gameObject.SetActive(isUnlocked && !isMaxLevel);
         upgradeBtn.onClick.AddListener(() =>
         {
@@ -173,6 +174,12 @@ public class SkillShopManager : MonoBehaviour
     }
 
     // 헬퍼
+
+    public void RegisterLocalPlayer(PlayerSkill skill)
+    {
+        localPlayerSkill = skill;
+        Debug.Log("[상점] 로컬 PlayerSkill 등록 완료");
+    }
 
     private PlayerSkill FindLocalPlayerSkill()
     {

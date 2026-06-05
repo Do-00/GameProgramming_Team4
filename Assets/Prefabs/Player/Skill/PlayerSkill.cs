@@ -30,6 +30,14 @@ public class PlayerSkill : NetworkBehaviour
     [SerializeField] private Slider dashCooldownSlider;
     [SerializeField] private Slider searchCooldownSlider;
 
+    [Header("UI — 스킬 슬롯 (배경/아이콘)")]
+    [SerializeField] private Image dashSlotBg;
+    [SerializeField] private GameObject dashSkillIcon;
+    [SerializeField] private Image searchSlotBg;
+    [SerializeField] private GameObject searchSkillIcon;
+    [SerializeField] private Sprite skillLockedSprite;
+    [SerializeField] private Sprite skillUnlockedSprite;
+
     // 네트워크 변수 (서버 → 모든 클라이언트 동기화)
 
     /// <summary>
@@ -103,9 +111,20 @@ public class PlayerSkill : NetworkBehaviour
         HandleSkillInput();
     }
 
+    public override void OnNetworkSpawn()
+    {
+        if (IsOwner && SkillShopManager.Instance != null)
+            SkillShopManager.Instance.RegisterLocalPlayer(this);
+
+        if (IsOwner)
+        {
+            dashUnlocked.OnValueChanged += (_, _) => UpdateCooldownUI();
+            searchUnlocked.OnValueChanged += (_, _) => UpdateCooldownUI();
+        }
+    }
+
     public override void OnNetworkDespawn()
     {
-        // 탐색 아웃라인이 켜진 채로 오브젝트가 사라지는 상황 방지
         ClearSearchOutlines();
     }
 
@@ -119,12 +138,26 @@ public class PlayerSkill : NetworkBehaviour
 
     private void UpdateCooldownUI()
     {
-        // 슬라이더 값: 0 = 쿨다운 중, 1 = 사용 가능
-        if (dashCooldownSlider != null)
-            dashCooldownSlider.value = 1f - Mathf.Clamp01(dashCooldownRemaining / dashSkillCooldown);
+        float dashProgress = 1f - Mathf.Clamp01(dashCooldownRemaining / dashSkillCooldown);
+        float searchProgress = 1f - Mathf.Clamp01(searchCooldownRemaining / searchCooldown);
 
+        if (dashCooldownSlider != null)
+            dashCooldownSlider.value = dashProgress;
         if (searchCooldownSlider != null)
-            searchCooldownSlider.value = 1f - Mathf.Clamp01(searchCooldownRemaining / searchCooldown);
+            searchCooldownSlider.value = searchProgress;
+
+        bool dashReady = dashUnlocked.Value && dashCooldownRemaining <= 0f;
+        bool searchReady = searchUnlocked.Value && searchCooldownRemaining <= 0f;
+
+        if (dashSlotBg != null && skillLockedSprite != null && skillUnlockedSprite != null)
+            dashSlotBg.sprite = dashReady ? skillUnlockedSprite : skillLockedSprite;
+        if (dashSkillIcon != null)
+            dashSkillIcon.SetActive(dashUnlocked.Value);
+
+        if (searchSlotBg != null && skillLockedSprite != null && skillUnlockedSprite != null)
+            searchSlotBg.sprite = searchReady ? skillUnlockedSprite : skillLockedSprite;
+        if (searchSkillIcon != null)
+            searchSkillIcon.SetActive(searchUnlocked.Value);
     }
 
     // 입력 처리

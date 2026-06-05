@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3da26a149f05c6d4499a8ace8360a3d4, type: 3}
+  m_Name: DashSkill
+  m_EditorClassIdentifier: Assembly-CSharp::SkillData
+  skillType: 0
+  skillName: DashSkill
+  description: FAST RUN!
+  icon: {fileID: 21300000, guid: c9ea7a4d70c46914cb16e42c32a1ca86, type: 3}
+  unlockCost: 3
+  upgrades:
+  - upgradeName: Lv. 2
+    upgradeDescription: MORE FAST
+    cost: 4
+    bonusDuration: 0.8
+    bonusRadius: 0
+  - upgradeName: Lv. 1
+    upgradeDescription: MOST SPEED
+    cost: 2
+    bonusDuration: 0.5
+    bonusRadius: 0
