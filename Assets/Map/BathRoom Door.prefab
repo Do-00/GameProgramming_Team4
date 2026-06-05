@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1129177189489787016}
   - component: {fileID: 669919919122044243}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: BathRoom Door
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -78,7 +78,7 @@ GameObject:
   - component: {fileID: 999548974759123157}
   - component: {fileID: 6255939218466620163}
   - component: {fileID: 1218935344228428996}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Door3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -190,7 +190,7 @@ GameObject:
   - component: {fileID: 7289338627527777689}
   - component: {fileID: 6374438309986745620}
   - component: {fileID: 511995743172297541}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Door2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -974,7 +974,7 @@ GameObject:
   - component: {fileID: 3261778549376389893}
   - component: {fileID: 3686808029153563474}
   - component: {fileID: 8708793825906484338}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Door1
   m_TagString: Untagged
   m_Icon: {fileID: 0}

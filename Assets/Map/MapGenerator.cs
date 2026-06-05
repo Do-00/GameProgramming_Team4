@@ -13,6 +13,33 @@ public class MapGenerator : NetworkBehaviour
         public GameObject prefab;
         public Vector2Int size;
         public RoomType type;
+
+        [Header("이 방 전용 가구 설정")]
+        public List<FurnitureData> wallPool;
+        public List<FurnitureData> centerPool;
+    }
+
+    [System.Serializable]
+    public struct FurnitureData
+    {
+        public GameObject prefab;
+        [Range(0f, 1f)] public float spawnChance;
+        public bool isUnique;
+    }
+
+    [System.Serializable]
+    public struct ItemData
+    {
+        public GameObject prefab;
+        [Range(0f, 1f)] public float spawnChance;
+    }
+
+    // ? [새로 추가됨] 적 생성용 데이터 구조체
+    [System.Serializable]
+    public struct EnemyData
+    {
+        public GameObject prefab; // ?? 반드시 NetworkObject가 붙어있어야 합니다!
+        [Range(0f, 1f)] public float spawnChance; // 일반 방 스폰 확률
     }
 
     private class RoomInstance
@@ -21,13 +48,41 @@ public class MapGenerator : NetworkBehaviour
         public Vector2Int originGrid;
         public RoomType roomType;
         public Vector2Int size;
+        public List<FurnitureData> assignedWallPool;
+        public List<FurnitureData> assignedCenterPool;
     }
 
     [Header("프리팹 데이터 베이스")]
     [SerializeField] private GameObject livingRoomPrefab;
     [SerializeField] private GameObject bathroomPrefab;
     [SerializeField] private GameObject doorPrefab;
+
+    [Header("일반 방(Variants) 종합 설정")]
     [SerializeField] private List<RoomPrefabData> normalRoomVariants = new List<RoomPrefabData>();
+
+    [Header("★ 거실(LivingRoom) 전용 가구 설정")]
+    [SerializeField] private List<FurnitureData> livingWallPool = new List<FurnitureData>();
+    [SerializeField] private List<FurnitureData> livingCenterPool = new List<FurnitureData>();
+
+    [Header("★ 화장실(Bathroom) 전용 가구 설정")]
+    [SerializeField] private List<FurnitureData> bathroomWallPool = new List<FurnitureData>();
+    [SerializeField] private List<FurnitureData> bathroomCenterPool = new List<FurnitureData>();
+
+    [Header("★ 음식/아이템(Food) 스폰 설정")]
+    [SerializeField] private List<ItemData> foodItemPool = new List<ItemData>();
+
+    // ? [새로 추가됨] 인스펙터 적 프리팹 설정 주머니
+    [Header("★ 적(Enemy) 스폰 설정")]
+    [SerializeField] private GameObject catPrefab; // 거실 고정 고양이 프리팹
+    [SerializeField] private EnemyData spiderData; // 일반 방 확률 스폰 거미 데이터
+
+    [Header("충돌 감지 설정")]
+    [SerializeField] private LayerMask furnitureLayer;
+    [SerializeField] private LayerMask itemSpawnRaycastMask;
+
+    [Header("★ 음식 스폰 밸런스 옵션")]
+    [SerializeField] private int minItemsPerUnit = 1;
+    [SerializeField] private int maxItemsPerUnit = 3;
 
     [Header("설정 수치")]
     [SerializeField] private float unitSize = 50f;
@@ -51,25 +106,20 @@ public class MapGenerator : NetworkBehaviour
 
     private List<GameObject> spawnedRoomObjects = new List<GameObject>();
 
-    // ? OnNetworkSpawn 시점에 서버가 시드를 생성하여 뿌립니다.
     public override void OnNetworkSpawn()
     {
         if (IsServer)
         {
             int randomSeed = Random.Range(1, 100000);
-
-            // 서버 자신도 맵을 생성하고
             StartCoroutine(GenerateMapNextFrame(randomSeed));
-            // 클라이언트들에게도 동일한 시드로 생성하라고 명령합니다.
             GenerateMapClientRpc(randomSeed);
         }
     }
 
-    // ? 클라이언트들이 서버와 동일한 시드를 원격으로 전달받는 통로
     [ClientRpc]
     private void GenerateMapClientRpc(int seed)
     {
-        if (IsServer) return; // 서버는 이미 위에서 생성 중이므로 중복 실행 방지
+        if (IsServer) return;
         StartCoroutine(GenerateMapNextFrame(seed));
     }
 
@@ -81,7 +131,6 @@ public class MapGenerator : NetworkBehaviour
 
     private void GenerateValidHouse(int seed)
     {
-        // ?? [가장 중요] 동일한 난수 카드를 뽑도록 시드를 고정합니다.
         Random.InitState(seed);
 
         int attempts = 0;
@@ -96,10 +145,16 @@ public class MapGenerator : NetworkBehaviour
             if (totalRoomCount == targetRoomCount)
             {
                 CarveWallsAndSpawnDoors();
+                SpawnFurnitureInRooms();
 
-                Debug.Log($"[MapGenerator] 시드({seed}) {attempts}번째 시도 성공! 최종 방 개수: {totalRoomCount}개");
+                // 가구 배치가 완전히 동기화되어 고정된 후 물체들을 배치합니다.
+                SpawnFoodItemsWithRaycast();
 
-                // ?? 문(Door) 오브젝트 동기화: 문 생성은 오직 서버에서만 Spawn을 선언하여 멀티 동기화를 제어합니다.
+                // ? [새로 추가됨] 적 생성 함수 호출
+                SpawnEnemiesWithRaycast();
+
+                Debug.Log($"[MapGenerator] 시드({seed}) 생성 성공! 오브젝트 총합: {spawnedRoomObjects.Count}개");
+
                 if (IsServer)
                 {
                     foreach (GameObject obj in spawnedRoomObjects)
@@ -140,7 +195,15 @@ public class MapGenerator : NetworkBehaviour
         Vector3 livingRoomPos = new Vector3(unitSize / 2f, 0f, unitSize / 2f);
         GameObject lrObj = InstantiateRoomObject(livingRoomPrefab, livingRoomPos);
 
-        RoomInstance lrInstance = new RoomInstance { roomObject = lrObj, originGrid = new Vector2Int(0, 0), roomType = RoomType.LivingRoom, size = new Vector2Int(2, 2) };
+        RoomInstance lrInstance = new RoomInstance
+        {
+            roomObject = lrObj,
+            originGrid = new Vector2Int(0, 0),
+            roomType = RoomType.LivingRoom,
+            size = new Vector2Int(2, 2),
+            assignedWallPool = livingWallPool,
+            assignedCenterPool = livingCenterPool
+        };
         roomGridMap.Add(new Vector2Int(0, 0), lrInstance);
         roomGridMap.Add(new Vector2Int(1, 0), lrInstance);
         roomGridMap.Add(new Vector2Int(0, 1), lrInstance);
@@ -181,6 +244,7 @@ public class MapGenerator : NetworkBehaviour
 
         GameObject selectedPrefab = null;
         Vector2Int roomSize = new Vector2Int(1, 1);
+        RoomPrefabData chosenData = default;
 
         if (assignedType == RoomType.Bathroom)
         {
@@ -201,13 +265,15 @@ public class MapGenerator : NetworkBehaviour
                 {
                     selectedPrefab = variant.prefab;
                     roomSize = variant.size;
+                    chosenData = variant;
                     break;
                 }
             }
 
             if (selectedPrefab == null && normalRoomVariants.Count > 0)
             {
-                selectedPrefab = normalRoomVariants[0].prefab;
+                chosenData = normalRoomVariants[0];
+                selectedPrefab = chosenData.prefab;
                 roomSize = new Vector2Int(1, 1);
             }
         }
@@ -221,7 +287,16 @@ public class MapGenerator : NetworkBehaviour
         );
 
         GameObject roomObj = InstantiateRoomObject(selectedPrefab, worldPos);
-        RoomInstance roomInstance = new RoomInstance { roomObject = roomObj, originGrid = gridPos, roomType = assignedType, size = roomSize };
+
+        RoomInstance roomInstance = new RoomInstance
+        {
+            roomObject = roomObj,
+            originGrid = gridPos,
+            roomType = assignedType,
+            size = roomSize,
+            assignedWallPool = (assignedType == RoomType.Bathroom) ? bathroomWallPool : chosenData.wallPool,
+            assignedCenterPool = (assignedType == RoomType.Bathroom) ? bathroomCenterPool : chosenData.centerPool
+        };
 
         for (int x = 0; x < roomSize.x; x++)
         {
@@ -307,7 +382,6 @@ public class MapGenerator : NetworkBehaviour
 
                         if (dir == Vector2Int.up)
                         {
-                            // ?? 벽 비활성화는 서버와 클라이언트 '모두' 자기 컴퓨터에서 실행합니다.
                             string detailedWallNorth = $"Wall_North_{localGrid.x}_{localGrid.y}";
                             Transform wallNorth = FindChildRecursive(currentRoom.transform, detailedWallNorth);
                             if (wallNorth == null) wallNorth = FindChildRecursive(currentRoom.transform, "Wall_North");
@@ -319,7 +393,6 @@ public class MapGenerator : NetworkBehaviour
                             if (wallSouth == null) wallSouth = FindChildRecursive(neighborRoom.transform, "Wall_South");
                             if (wallSouth != null) wallSouth.gameObject.SetActive(false);
 
-                            // ?? 문 오브젝트 생성은 오직 '서버'만 수행합니다. (클라이언트는 스폰 동기화로 받아옴)
                             if (IsServer)
                             {
                                 string detailedSocketName = $"Socket_North_{localGrid.x}_{localGrid.y}";
@@ -336,7 +409,6 @@ public class MapGenerator : NetworkBehaviour
                         }
                         else if (dir == Vector2Int.right)
                         {
-                            // ?? 벽 비활성화는 서버와 클라이언트 '모두' 실행
                             string detailedWallEast = $"Wall_East_{localGrid.x}_{localGrid.y}";
                             Transform wallEast = FindChildRecursive(currentRoom.transform, detailedWallEast);
                             if (wallEast == null) wallEast = FindChildRecursive(currentRoom.transform, "Wall_East");
@@ -348,7 +420,6 @@ public class MapGenerator : NetworkBehaviour
                             if (wallWest == null) wallWest = FindChildRecursive(neighborRoom.transform, "Wall_West");
                             if (wallWest != null) wallWest.gameObject.SetActive(false);
 
-                            // ?? 문 오브젝트 생성은 오직 '서버'만 수행
                             if (IsServer)
                             {
                                 string detailedSocketName = $"Socket_East_{localGrid.x}_{localGrid.y}";
@@ -367,6 +438,270 @@ public class MapGenerator : NetworkBehaviour
                 }
             }
         }
+    }
+
+    private void SpawnFurnitureInRooms()
+    {
+        List<GameObject> checkedRooms = new List<GameObject>();
+
+        foreach (KeyValuePair<Vector2Int, RoomInstance> cell in roomGridMap)
+        {
+            if (cell.Value == null || checkedRooms.Contains(cell.Value.roomObject)) continue;
+            GameObject roomObj = cell.Value.roomObject;
+            checkedRooms.Add(roomObj);
+
+            HashSet<GameObject> spawnedUniquePrefabs = new HashSet<GameObject>();
+            Transform[] allChildren = roomObj.GetComponentsInChildren<Transform>(false);
+
+            foreach (Transform child in allChildren)
+            {
+                if (child.name.StartsWith("Socket_Furniture"))
+                {
+                    List<FurnitureData> selectedPool = null;
+
+                    if (child.name.Contains("_Wall"))
+                    {
+                        selectedPool = cell.Value.assignedWallPool;
+                    }
+                    else if (child.name.Contains("_Center"))
+                    {
+                        selectedPool = cell.Value.assignedCenterPool;
+                    }
+
+                    if (selectedPool == null || selectedPool.Count == 0) continue;
+
+                    List<FurnitureData> availableFurniture = new List<FurnitureData>();
+                    foreach (var furniture in selectedPool)
+                    {
+                        if (furniture.isUnique && spawnedUniquePrefabs.Contains(furniture.prefab))
+                        {
+                            continue;
+                        }
+                        availableFurniture.Add(furniture);
+                    }
+
+                    if (availableFurniture.Count == 0) continue;
+
+                    for (int i = availableFurniture.Count - 1; i > 0; i--)
+                    {
+                        int r = Random.Range(0, i + 1);
+                        var temp = availableFurniture[i]; availableFurniture[i] = availableFurniture[r]; availableFurniture[r] = temp;
+                    }
+
+                    foreach (var furniture in availableFurniture)
+                    {
+                        if (Random.value <= furniture.spawnChance)
+                        {
+                            if (furniture.prefab == null) continue;
+
+                            BoxCollider boxCol = furniture.prefab.GetComponentInChildren<BoxCollider>();
+                            if (boxCol != null)
+                            {
+                                Vector3 localCenter = boxCol.transform.localPosition + boxCol.center;
+                                Vector3 worldCenter = child.position + (child.rotation * localCenter);
+
+                                Vector3 halfExtents = boxCol.size * 0.5f;
+                                halfExtents *= 0.95f;
+
+                                Quaternion worldRotation = child.rotation * boxCol.transform.localRotation;
+
+                                Collider[] hitColliders = Physics.OverlapBox(worldCenter, halfExtents, worldRotation, furnitureLayer);
+
+                                if (hitColliders.Length > 0) continue;
+                            }
+
+                            GameObject furnitureObj = Instantiate(furniture.prefab, child.position, child.rotation);
+                            furnitureObj.transform.SetParent(roomObj.transform);
+
+                            Physics.SyncTransforms();
+
+                            if (furniture.isUnique)
+                            {
+                                spawnedUniquePrefabs.Add(furniture.prefab);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void SpawnFoodItemsWithRaycast()
+    {
+        if (!IsServer) return;
+        if (foodItemPool.Count == 0) return;
+
+        List<GameObject> checkedRooms = new List<GameObject>();
+
+        foreach (KeyValuePair<Vector2Int, RoomInstance> cell in roomGridMap)
+        {
+            if (cell.Value == null || checkedRooms.Contains(cell.Value.roomObject)) continue;
+            RoomInstance currentRoom = cell.Value;
+            checkedRooms.Add(currentRoom.roomObject);
+
+            int totalCells = currentRoom.size.x * currentRoom.size.y;
+            int itemSpawnAttempts = Random.Range(minItemsPerUnit, maxItemsPerUnit + 1) * totalCells;
+
+            Vector3 roomCenterWorldPos = currentRoom.roomObject.transform.position;
+
+            float totalWorldWidth = currentRoom.size.x * unitSize;
+            float totalWorldLength = currentRoom.size.y * unitSize;
+
+            float halfWidth = totalWorldWidth * 0.5f;
+            float halfLength = totalWorldLength * 0.5f;
+
+            float minX = roomCenterWorldPos.x - halfWidth;
+            float maxX = roomCenterWorldPos.x + halfWidth;
+            float minZ = roomCenterWorldPos.z - halfLength;
+            float maxZ = roomCenterWorldPos.z + halfLength;
+
+            minX += 2.5f; maxX -= 2.5f;
+            minZ += 2.5f; maxZ -= 2.5f;
+
+            for (int i = 0; i < itemSpawnAttempts; i++)
+            {
+                ItemData selectedItem = foodItemPool[Random.Range(0, foodItemPool.Count)];
+
+                if (Random.value <= selectedItem.spawnChance)
+                {
+                    if (selectedItem.prefab == null) continue;
+
+                    float randomX = Random.Range(minX, maxX);
+                    float randomZ = Random.Range(minZ, maxZ);
+
+                    Vector3 rayOrigin = new Vector3(randomX, 20f, randomZ);
+
+                    RaycastHit[] hits = Physics.RaycastAll(rayOrigin, Vector3.down, 40f, itemSpawnRaycastMask);
+
+                    if (hits.Length > 0)
+                    {
+                        Vector3 highestPoint = hits[0].point;
+                        float highestY = hits[0].point.y;
+
+                        for (int j = 1; j < hits.Length; j++)
+                        {
+                            if (hits[j].point.y > highestY)
+                            {
+                                highestY = hits[j].point.y;
+                                highestPoint = hits[j].point;
+                            }
+                        }
+
+                        Vector3 spawnPosition = highestPoint;
+
+                        GameObject itemObj = Instantiate(selectedItem.prefab, spawnPosition, Quaternion.identity);
+                        NetworkObject netObj = itemObj.GetComponent<NetworkObject>();
+                        if (netObj != null)
+                        {
+                            netObj.Spawn();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ? [새로 추가됨] 조건형 스마트 적(Enemy) 레이저 드롭 엔진
+    private void SpawnEnemiesWithRaycast()
+    {
+        if (!IsServer) return; // 멀티플레이 스폰 권한 방어
+
+        List<GameObject> checkedRooms = new List<GameObject>();
+        List<RoomInstance> nonLivingRooms = new List<RoomInstance>();
+
+        int spawnedSpiderCount = 0; // 이번 판에 태어난 총 거미 카운트 변수
+
+        // 1단계: 맵 전역 순회하며 확정 구역(거실) 연산 진행 및 일반 방 후보 수집
+        foreach (KeyValuePair<Vector2Int, RoomInstance> cell in roomGridMap)
+        {
+            if (cell.Value == null || checkedRooms.Contains(cell.Value.roomObject)) continue;
+            RoomInstance currentRoom = cell.Value;
+            checkedRooms.Add(currentRoom.roomObject);
+
+            // ?? 규칙 1: 거실이라면 주사인 굴리지 않고 무조건 고양이 1마리 확정 스폰!
+            if (currentRoom.roomType == RoomType.LivingRoom)
+            {
+                if (catPrefab != null)
+                {
+                    SpawnEnemyInRoomBounds(currentRoom, catPrefab);
+                }
+            }
+            else
+            {
+                // 거실이 아닌 일반 방, 화장실 등은 2단계 연산을 위해 따로 리스트에 수집
+                nonLivingRooms.Add(currentRoom);
+            }
+        }
+
+        // 2단계: 수집된 일반 방들을 돌며 설정된 확률로 거미 스폰 진행
+        if (spiderData.prefab != null && nonLivingRooms.Count > 0)
+        {
+            foreach (RoomInstance room in nonLivingRooms)
+            {
+                if (Random.value <= spiderData.spawnChance)
+                {
+                    bool success = SpawnEnemyInRoomBounds(room, spiderData.prefab);
+                    if (success) spawnedSpiderCount++;
+                }
+            }
+
+            // ?? 규칙 2: 맵 전체를 다 돌았는데 운이 나빠 거미가 0마리라면?
+            // "최소 한 마리는 무조건 생성" 규칙을 위해 수집된 일반 방 중 랜덤으로 1곳을 골라 강제 소환!
+            if (spawnedSpiderCount == 0 && nonLivingRooms.Count > 0)
+            {
+                RoomInstance fallbackRoom = nonLivingRooms[Random.Range(0, nonLivingRooms.Count)];
+                SpawnEnemyInRoomBounds(fallbackRoom, spiderData.prefab);
+                Debug.Log($"[MapGenerator] 거미가 확률을 못 뚫어 {fallbackRoom.roomObject.name}에 최소 보장 거미 1마리를 강제 생성했습니다.");
+            }
+        }
+    }
+
+    // ? [적 스폰용 헬퍼 함수] 지정된 방 면적 내에 안전하게 탑다운 레이저로 적을 떨어뜨립니다.
+    private bool SpawnEnemyInRoomBounds(RoomInstance room, GameObject enemyPrefab)
+    {
+        Vector3 roomCenter = room.roomObject.transform.position;
+        float halfWidth = (room.size.x * unitSize) * 0.5f;
+        float halfLength = (room.size.y * unitSize) * 0.5f;
+
+        // 벽에 끼지 않도록 패딩 세팅
+        float minX = roomCenter.x - halfWidth + 3.0f;
+        float maxX = roomCenter.x + halfWidth - 3.0f;
+        float minZ = roomCenter.z - halfLength + 3.0f;
+        float maxZ = roomCenter.z + halfLength - 3.0f;
+
+        float randomX = Random.Range(minX, maxX);
+        float randomZ = Random.Range(minZ, maxZ);
+
+        Vector3 rayOrigin = new Vector3(randomX, 20f, randomZ);
+        RaycastHit[] hits = Physics.RaycastAll(rayOrigin, Vector3.down, 40f, itemSpawnRaycastMask);
+
+        if (hits.Length > 0)
+        {
+            Vector3 highestPoint = hits[0].point;
+            float highestY = hits[0].point.y;
+
+            for (int j = 1; j < hits.Length; j++)
+            {
+                if (hits[j].point.y > highestY)
+                {
+                    highestY = hits[j].point.y;
+                    highestPoint = hits[j].point;
+                }
+            }
+
+            // 안전한 착지점 좌표 획득 (가구 위 혹은 바닥)
+            Vector3 spawnPosition = highestPoint;
+
+            GameObject enemyObj = Instantiate(enemyPrefab, spawnPosition, Quaternion.identity);
+            NetworkObject netObj = enemyObj.GetComponent<NetworkObject>();
+            if (netObj != null)
+            {
+                netObj.Spawn();
+            }
+            return true; // 스폰 성공 반환
+        }
+        return false; // 스폰 실패 반환
     }
 
     private Transform FindChildRecursive(Transform parent, string targetName)

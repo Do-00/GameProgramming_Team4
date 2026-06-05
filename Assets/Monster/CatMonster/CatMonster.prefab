@@ -109,7 +109,7 @@ MonoBehaviour:
   rotateSpeed: 10
   stareDuration: 2
   pauseDuration: 0.5
-  pounceInitialSpeed: 40
+  pounceInitialSpeed: 200
   pounceFriction: 3
   airAttackThreshold: 2
   jumpArcOffset: 1.5
@@ -121,7 +121,7 @@ MonoBehaviour:
   stunDuration: 5
   obstacleLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 64
   catAnimator: {fileID: 7471629925484926406}
   catModel: {fileID: 1292749980816822338}
 --- !u!114 &4025186576436033592
