@@ -5,6 +5,11 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody))]
 public class MonsterCatAI : NetworkBehaviour
 {
+    private AudioSource audioSource;
+ 
+    public AudioClip attackSound;
+    public AudioClip jumpSound;
+    public AudioClip stunSound;
     public enum CatState
     {
         Idle,
@@ -56,7 +61,28 @@ public class MonsterCatAI : NetworkBehaviour
     private bool isJumpingAttack = false;
     private bool canStunFromCollision = false;
 
-    private void Awake() { rb = GetComponent<Rigidbody>(); }
+    private void Awake() { rb = GetComponent<Rigidbody>(); audioSource = GetComponent<AudioSource>(); }
+
+    // null 안전 사운드 재생 헬퍼
+    private void PlaySound(AudioClip clip)
+    {
+        if (audioSource != null && clip != null)
+            audioSource.PlayOneShot(clip);
+    }
+
+    // 서버에서 호출 → 모든 클라이언트에서 사운드 재생 (0=attack, 1=jump, 2=stun)
+    [ClientRpc]
+    private void PlaySoundClientRpc(int soundIndex)
+    {
+        AudioClip clip = soundIndex switch
+        {
+            0 => attackSound,
+            1 => jumpSound,
+            2 => stunSound,
+            _ => null
+        };
+        PlaySound(clip);
+    }
 
     public override void OnNetworkSpawn()
     {
@@ -168,6 +194,7 @@ public class MonsterCatAI : NetworkBehaviour
 
         if (isJumpingAttack)
         {
+            PlaySoundClientRpc(1); // jumpSound
 
             Vector3 displacement = lockedTargetPos - transform.position;
             Vector3 displacementXZ = new Vector3(displacement.x, 0, displacement.z);
@@ -241,6 +268,7 @@ public class MonsterCatAI : NetworkBehaviour
                 rb.linearVelocity = Vector3.zero;
                 currentState.Value = CatState.Stunned;
                 Debug.Log("[서버 고양이] 장애물에 충돌하여 기절합니다!");
+                PlaySoundClientRpc(2); // stunSound
             }
         }
     }
@@ -263,6 +291,7 @@ public class MonsterCatAI : NetworkBehaviour
                 float currentDamage = isJumpingAttack ? airJumpDamage : dashDamage;
 
                 player.TakeDamage(currentDamage);
+                PlaySoundClientRpc(0); // attackSound
                 Debug.Log($"[서버 고양이] 관통 공격 성공! 데미지: {currentDamage} (점프 공격: {isJumpingAttack})");
             }
         }

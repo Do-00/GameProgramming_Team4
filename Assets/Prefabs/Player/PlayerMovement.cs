@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 [RequireComponent(typeof(Rigidbody))]
 public class PlayerMovement : NetworkBehaviour
-{
+{   
     [Header("이동 설정")]
     [SerializeField] private float walkSpeed = 10f;      // 걷는 속도
     [SerializeField] private float sprintSpeed = 15f;     // 달리는 속도
@@ -79,12 +79,23 @@ public class PlayerMovement : NetworkBehaviour
     private Vector3 dashDirection;    // 대쉬 방향 (서버가 관리)
     private float currentDashSpeed = 0f;  // 현재 대쉬 속도 (서버가 관리)
 
+    private AudioSource audioSource; // 사 운 드
+    public AudioClip jump_s;
+    public AudioClip damage_s;
+    public AudioClip die_s;
+    public AudioClip eat_s;
+    public AudioClip walk_s;
+    public AudioClip plop_s;
+    public AudioClip land_s;              // 착지 사운드
+    private float walkSoundTimer = 0f;    // 발소리 간격 타이머
+    private bool wasGrounded = true;      // 착지 감지용: 이전 프레임 지면 여부
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
         animator = GetComponent<Animator>();
-        playerSkill = GetComponent<PlayerSkill>(); 
-
+        playerSkill = GetComponent<PlayerSkill>();
+        audioSource = GetComponent<AudioSource>(); // ← 초기화 추가
     }
 
     public override void OnNetworkSpawn()
@@ -198,6 +209,9 @@ public class PlayerMovement : NetworkBehaviour
                 // 버튼을 바라본 게 아니라면 기존처럼 에너지를 확인하고 알을 낳음
                 if (currentEnergy.Value >= 1)
                 {
+                    if (audioSource != null && plop_s != null)
+                        audioSource.PlayOneShot(plop_s);
+
                     LayEggsServerRpc(ShelterZone.IsLocalPlayerInShelter);
                 }
             }
@@ -210,6 +224,27 @@ public class PlayerMovement : NetworkBehaviour
             animator.SetFloat("speed", horizontalSpeed);
             animator.SetBool("flying", isFlying);
             animator.SetBool("dash", isDashing);
+
+            bool grounded = IsGrounded();
+
+            // 착지 사운드: 이전 프레임 공중 → 이번 프레임 착지 (비행/대쉬/점프 제외)
+            if (grounded && !wasGrounded && !isFlying && !isDashing
+                && audioSource != null && land_s != null)
+            {
+                audioSource.PlayOneShot(land_s);
+            }
+            wasGrounded = grounded;
+
+            // 발소리: 땅 위에서 이동 중일 때 속도에 비례해 간격이 줄어듦
+            walkSoundTimer -= Time.deltaTime;
+            if (!isFlying && !isDashing && grounded && horizontalSpeed > 1f
+                && audioSource != null && walk_s != null && walkSoundTimer <= 0f)
+            {
+                audioSource.PlayOneShot(walk_s);
+                // 속도가 빠를수록 간격이 짧아짐 (walkSpeed 기준 정규화)
+                float speedRatio = Mathf.Max(horizontalSpeed / walkSpeed, 1f);
+                walkSoundTimer = walk_s.length / speedRatio;
+            }
         }
         else
         {
@@ -240,6 +275,7 @@ public class PlayerMovement : NetworkBehaviour
         if (!IsServer) return;
 
         currentHealth.Value = Mathf.Max(0f, currentHealth.Value - damageAmount);
+        PlaySoundClientRpc("damage");
         Debug.Log($"[{gameObject.name}] 맞았습니다! 남은 체력: {currentHealth.Value}");
 
         if (currentHealth.Value <= 0f)
@@ -254,6 +290,7 @@ public class PlayerMovement : NetworkBehaviour
 
         isDead.Value = true;
         deathCount.Value += 1;
+        PlaySoundClientRpc("die");
 
         SetDeathStateClientRpc(true);
 
@@ -492,6 +529,7 @@ public class PlayerMovement : NetworkBehaviour
                 if (foodNetObj != null)
                 {
                     EatFoodServerRpc(foodNetObj);
+
                 }
             }
         }
@@ -506,8 +544,8 @@ public class PlayerMovement : NetworkBehaviour
 
             currentEnergy.Value = Mathf.Min(maxEnergy, currentEnergy.Value + 10);
             foodNetObj.Despawn(false);
-
-            Debug.Log("[서버] 음식을 섭취했습니다! 에너지(포만감): " + currentEnergy.Value);
+            PlaySoundClientRpc("eat");
+            Debug.Log("[Server] Food eaten! Energy: " + currentEnergy.Value); // 음식섭취
         }
     }
 
@@ -605,6 +643,22 @@ public class PlayerMovement : NetworkBehaviour
             Debug.Log("살아있는 팀원이 없음... 게임 오버 대기 중.");
         }
     }
+    // 서버에서 호출 → 모든 클라이언트에서 해당 사운드 재생
+    [ClientRpc]
+    private void PlaySoundClientRpc(string clipName)
+    {
+        AudioClip clip = clipName switch
+        {
+            "damage" => damage_s,
+            "die"    => die_s,
+            "eat"    => eat_s,
+            "plop"   => plop_s,
+            _        => null
+        };
+        if (audioSource != null && clip != null)
+            audioSource.PlayOneShot(clip);
+    }
+
     [ClientRpc]
     public void TeleportClientRpc(Vector3 targetPosition)
     {
