@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 6954880233927224155}
   - component: {fileID: 2972604508960385482}
   - component: {fileID: 7177197117319523611}
-  m_Layer: 0
+  m_Layer: 11
   m_Name: Hambuger
   m_TagString: Food
   m_Icon: {fileID: 0}

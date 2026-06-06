@@ -94,9 +94,20 @@ public class MonsterCatAI : NetworkBehaviour
             Collider[] hits = Physics.OverlapSphere(transform.position, detectionRadius, playerLayer);
             if (hits.Length > 0)
             {
-                targetPlayer = hits[0].transform;
-                currentState.Value = CatState.Staring;
-                yield break;
+                Transform potentialTarget = hits[0].transform;
+
+                int sightLayerMask = playerLayer | obstacleLayer;
+
+                RaycastHit hit;
+                if (Physics.Linecast(transform.position + Vector3.up * 1f, potentialTarget.position, out hit, sightLayerMask))
+                {
+                    if (hit.collider.CompareTag("Player"))
+                    {
+                        targetPlayer = potentialTarget;
+                        currentState.Value = CatState.Staring;
+                        yield break;
+                    }
+                }
             }
             yield return new WaitForSeconds(0.5f);
         }

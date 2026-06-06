@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 2961754815343433010}
   m_Layer: 0
   m_Name: SpiderWeb_Line
-  m_TagString: Untagged
+  m_TagString: Cobweb
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -207,6 +207,7 @@ MonoBehaviour:
   lifetime: 60
   webThickness: 1
   visibleDistance: 16
+  fullyVisibleDistance: 8
   initialVisibleDuration: 2
   startPoint:
     UpdateTraits:

@@ -71,6 +71,7 @@ public class PlayerMovement : NetworkBehaviour
     private Rigidbody rb;
     private Vector3 inputVelocity = Vector3.zero;
     private Animator animator; //애니메이션 
+    private PlayerSkill playerSkill; // 플레이어 스킬
 
     private bool isDashing = false;   // 대쉬 중인지 여부 (서버가 관리)
     private float dashTimer = 0f;     // 대쉬 지속 시간 타이머
@@ -82,6 +83,8 @@ public class PlayerMovement : NetworkBehaviour
     {
         rb = GetComponent<Rigidbody>();
         animator = GetComponent<Animator>();
+        playerSkill = GetComponent<PlayerSkill>(); 
+
     }
 
     public override void OnNetworkSpawn()
@@ -195,7 +198,7 @@ public class PlayerMovement : NetworkBehaviour
                 // 버튼을 바라본 게 아니라면 기존처럼 에너지를 확인하고 알을 낳음
                 if (currentEnergy.Value >= 1)
                 {
-                    LayEggsServerRpc();
+                    LayEggsServerRpc(ShelterZone.IsLocalPlayerInShelter);
                 }
             }
 
@@ -390,7 +393,7 @@ public class PlayerMovement : NetworkBehaviour
     [ServerRpc]
     private void SubmitMovementServerRpc(Vector3 velocity, bool flyingState)
     {
-        // ✨ [수정됨 2번] 방어막을 밖으로 꺼내서 가장 윗줄에 배치하여 완벽하게 방어!
+        // [수정됨 2번] 방어막을 밖으로 꺼내서 가장 윗줄에 배치하여 완벽하게 방어!
         if (isDead.Value || rb.isKinematic) return;
 
         if (isFlightBlocked.Value)
@@ -426,30 +429,24 @@ public class PlayerMovement : NetworkBehaviour
             else rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         }
 
+        float mult = (playerSkill != null) ? playerSkill.speedMultiplier.Value : 1f;
+
         if (flyingState)
         {
-            rb.linearVelocity = velocity;
+            rb.linearVelocity = velocity * mult; // ← * mult 추가
         }
         else
         {
-            rb.linearVelocity = new Vector3(velocity.x, rb.linearVelocity.y, velocity.z);
-
-            if (rb.linearVelocity.y < 0)
-            {
-                rb.linearVelocity += Vector3.up * Physics.gravity.y * (fallMultiplier - 1) * Time.fixedDeltaTime;
-            }
-            else if (rb.linearVelocity.y > 0)
-            {
-                rb.linearVelocity += Vector3.up * Physics.gravity.y * (upwardMultiplier - 1) * Time.fixedDeltaTime;
-            }
+            rb.linearVelocity = new Vector3(velocity.x * mult, rb.linearVelocity.y, velocity.z * mult); // ← * mult 추가
         }
     }
 
-    [ServerRpc]
-    private void SubmitRotationServerRpc(float yRot)
-    {
-        netYRot.Value = yRot;
-    }
+        [ServerRpc]
+        private void SubmitRotationServerRpc(float yRot)
+        {
+            netYRot.Value = yRot;
+        }
+    
 
     private void HandleAimHighlight()
     {
@@ -515,16 +512,29 @@ public class PlayerMovement : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void LayEggsServerRpc()
+    private void LayEggsServerRpc(bool isInShelter)
     {
-        if (currentEnergy.Value >= 1 && eggPrefab != null)
+        if (currentEnergy.Value < 1 || eggPrefab == null)
         {
-            currentEnergy.Value -= 1;
-            Vector3 spawnPos = transform.position - transform.forward * 0.5f + Vector3.up * 0.2f + Random.insideUnitSphere * 0.1f;
+            Debug.Log($"[서버] 에너지 부족 | 에너지: {currentEnergy.Value}");
+            return;
+        }
+        currentEnergy.Value -= 1;
+
+        if (isInShelter)
+        {
+            // 화폐 알 — 스폰 없이 카운트만
+            GameManager.Instance.sharedEggCount.Value += 1;
+            Debug.Log($"[서버] 쉘터 알(화폐) +1 | 총: {GameManager.Instance.sharedEggCount.Value} | 에너지: {currentEnergy.Value}");
+        }
+        else
+        {
+            // 일반 알 — 월드에 스폰
+            Vector3 spawnPos = transform.position - transform.forward * 0.5f
+                + Vector3.up * 0.2f + Random.insideUnitSphere * 0.1f;
             GameObject newEgg = Instantiate(eggPrefab, spawnPos, Quaternion.identity);
             newEgg.GetComponent<NetworkObject>().Spawn();
-
-            Debug.Log($"[서버] 알을 1개 낳았습니다. 남은 에너지(포만감): {currentEnergy.Value}");
+            Debug.Log($"[서버] 일반 알 스폰 | 에너지: {currentEnergy.Value}");
         }
     }
 

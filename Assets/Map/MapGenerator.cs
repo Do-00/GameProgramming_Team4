@@ -108,12 +108,23 @@ public class MapGenerator : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        if (IsServer)
-        {
-            int randomSeed = Random.Range(1, 100000);
-            StartCoroutine(GenerateMapNextFrame(randomSeed));
-            GenerateMapClientRpc(randomSeed);
-        }
+        //if (IsServer)
+        //{
+        //   int randomSeed = Random.Range(1, 100000);
+        //   StartCoroutine(GenerateMapNextFrame(randomSeed));
+        //   GenerateMapClientRpc(randomSeed);
+        //}
+    }
+    public void BuildNewMapFromSeed(int seed)
+    {
+        // 실시간으로 전달받은 무작위 시드를 기반으로 안전하게 정밀 집 생성을 수동 가동합니다.
+        StartCoroutine(GenerateMapNextFrameManual(seed));
+    }
+
+    private IEnumerator GenerateMapNextFrameManual(int seed)
+    {
+        yield return null;
+        GenerateValidHouse(seed);
     }
 
     [ClientRpc]
