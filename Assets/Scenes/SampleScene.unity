@@ -2760,6 +2760,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: MainMenu
       objectReference: {fileID: 0}
+    - target: {fileID: 5734501073146016334, guid: 1b65ff0544104de4eab287f520b9a059, type: 3}
+      propertyPath: introBGM
+      value: 
+      objectReference: {fileID: 8300000, guid: 2f90f6a6619fac244b0ca56eeb3b9363, type: 3}
     - target: {fileID: 6877697482563617232, guid: 1b65ff0544104de4eab287f520b9a059, type: 3}
       propertyPath: m_Sprite
       value: 

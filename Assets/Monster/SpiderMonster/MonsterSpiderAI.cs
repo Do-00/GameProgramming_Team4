@@ -37,6 +37,11 @@ public class MonsterSpiderAI : NetworkBehaviour
     [SerializeField] private float webMinHeight = 1f;
     [SerializeField] private float webMaxHeight = 4f;
 
+    [Header("사운드")]
+    public AudioClip walkAlert_s;   // 플레이어 감지 직전(추적 전환 시) 1회 재생
+    public AudioClip attack_s;      // 공격 시도 시 재생
+    private AudioSource audioSource;
+
     private NetworkVariable<SpiderState> currentState = new NetworkVariable<SpiderState>(SpiderState.Patrol);
 
     private Rigidbody rb;
@@ -50,7 +55,18 @@ public class MonsterSpiderAI : NetworkBehaviour
 
     private List<NetworkObject> activeWebsList = new List<NetworkObject>();
 
-    private void Awake() { rb = GetComponent<Rigidbody>(); }
+    private void Awake()
+    {
+        rb = GetComponent<Rigidbody>();
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.spatialBlend = 1f;
+            audioSource.maxDistance = 30f;
+            audioSource.rolloffMode = AudioRolloffMode.Linear;
+        }
+    }
 
     public override void OnNetworkSpawn()
     {
@@ -88,6 +104,7 @@ public class MonsterSpiderAI : NetworkBehaviour
             {
                 targetPlayer = hits[0].transform;
                 isProximityChase = true;
+                PlaySoundClientRpc("walkAlert");
                 currentState.Value = SpiderState.Chase;
                 yield break;
             }
@@ -163,6 +180,7 @@ public class MonsterSpiderAI : NetworkBehaviour
     {
         // 1. 공격 시작 시 즉시 멈춤 (추적 로직이 아예 실행되지 않으므로 확실하게 멈춥니다)
         rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0);
+        PlaySoundClientRpc("attack");
 
         // 2. 멈칫하는 시간 대기
         yield return new WaitForSeconds(pauseDuration);
@@ -262,6 +280,19 @@ public class MonsterSpiderAI : NetworkBehaviour
             if (oldestWeb != null && oldestWeb.IsSpawned) oldestWeb.Despawn(true);
             activeWebsList.RemoveAt(0);
         }
+    }
+
+    [ClientRpc]
+    private void PlaySoundClientRpc(string clipName)
+    {
+        AudioClip clip = clipName switch
+        {
+            "walkAlert" => walkAlert_s,
+            "attack"    => attack_s,
+            _ => null
+        };
+        if (audioSource != null && clip != null)
+            audioSource.PlayOneShot(clip);
     }
 
     public void AlertByWeb(Transform player)

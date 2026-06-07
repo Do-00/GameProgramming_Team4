@@ -39,8 +39,18 @@ public class NetworkUI : MonoBehaviour
     [SerializeField] private Button closeSettingBtn;  // 설정 창 안의 닫기 버튼
     [SerializeField] private Toggle windowModeToggle; // 창모드 토글
 
+    [Header("배경음")]
+    [SerializeField] private AudioClip introBGM;      // 메인 메뉴 반복 배경음
+    private AudioSource bgmSource;
+
     private async void Start()  // 게임 시작 시 초기화 및 UI 설정
     {
+        bgmSource = gameObject.AddComponent<AudioSource>();
+        bgmSource.clip = introBGM;
+        bgmSource.loop = true;
+        bgmSource.playOnAwake = false;
+        if (introBGM != null) bgmSource.Play();
+
         ShowMainMenu();
         codeText.gameObject.SetActive(false);  // 방 코드 텍스트는 처음에 숨김
         pausePanel.SetActive(false);         // 일시정지 패널도 처음에는 숨김
@@ -231,6 +241,8 @@ public class NetworkUI : MonoBehaviour
 
     private void HideAllUI()  // 모든 UI 요소를 비활성화하여 게임 화면만 보이도록 설정
     {
+        if (bgmSource != null && bgmSource.isPlaying) bgmSource.Stop();
+
         hostBtn.gameObject.SetActive(false);
         clientBtn.gameObject.SetActive(false);
         quitBtn.gameObject.SetActive(false);

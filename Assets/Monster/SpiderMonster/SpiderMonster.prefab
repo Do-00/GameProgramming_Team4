@@ -146,6 +146,8 @@ MonoBehaviour:
   maxWebLength: 100
   webMinHeight: 1
   webMaxHeight: 30
+  walkAlert_s: {fileID: 8300000, guid: 98696fac9ae019d45840acbfbf386e0c, type: 3}
+  attack_s: {fileID: 8300000, guid: 706c5b4e31cd30148895940fd0c0a723, type: 3}
 --- !u!114 &3955832707246480739
 MonoBehaviour:
   m_ObjectHideFlags: 0

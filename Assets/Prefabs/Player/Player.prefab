@@ -2096,13 +2096,16 @@ MonoBehaviour:
   interactDistance: 4
   eatDuration: 2
   holdPoint: {fileID: 2019637935927306719}
-  jump_s: {fileID: 8300000, guid: 61518425b5ed79449b76f4a3c037d66a, type: 3}
+  jump_s: {fileID: 8300000, guid: 390e308887322bd4384d3c7215f2af6e, type: 3}
   damage_s: {fileID: 8300000, guid: 5d375c254ba67da43821be0c14833109, type: 3}
   die_s: {fileID: 8300000, guid: 69969d1bf02933b4db83cf708011825a, type: 3}
-  eat_s: {fileID: 8300000, guid: 40a9382c7452a0e4a9dbb7f8492357d1, type: 3}
-  walk_s: {fileID: 8300000, guid: 0fb9150d3c3b1fe41a9d95ca729d0dff, type: 3}
-  plop_s: {fileID: 8300000, guid: 44e0ca39758d18c4bbfdd876e063b2f1, type: 3}
-  land_s: {fileID: 8300000, guid: 9fb4b64aa8dbd2a41ad8e3ee17ce85d2, type: 3}
+  eat_s: {fileID: 8300000, guid: 60b16464dee4cea4c8edce534046a869, type: 3}
+  walk_s: {fileID: 8300000, guid: 4e4e87781a19a304885e8220d8dbc423, type: 3}
+  plop_s: {fileID: 8300000, guid: 88f59abc089dd3844b7a7e0fd8629588, type: 3}
+  land_s: {fileID: 8300000, guid: 911649c285754334aa64b031e451ec29, type: 3}
+  flyStart_s: {fileID: 8300000, guid: 100599a40e335234e860dad229098af1, type: 3}
+  flyLoop_s: {fileID: 8300000, guid: 374f9454b0804f64ba541c6e33df99f3, type: 3}
+  webStruggle_s: {fileID: 8300000, guid: 814ce0ef882d3724aa8bb46ee9d313dd, type: 3}
 --- !u!114 &6074832100507803630
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2212,6 +2215,8 @@ MonoBehaviour:
   searchSkillIcon: {fileID: 447704487627604749}
   skillLockedSprite: {fileID: 21300000, guid: 887f2ef956e34e644877763e00f85457, type: 3}
   skillUnlockedSprite: {fileID: 21300000, guid: 394e5824128ce9b4593d6bb58aae7089, type: 3}
+  dashSkill_s: {fileID: 8300000, guid: f212c0a3880a1e04ebc502ebe0df53c9, type: 3}
+  searchSkill_s: {fileID: 8300000, guid: 43de4c0a5523ce844b52e64ec1d59533, type: 3}
   speedMultiplier:
     UpdateTraits:
       MinSecondsBetweenUpdates: 0

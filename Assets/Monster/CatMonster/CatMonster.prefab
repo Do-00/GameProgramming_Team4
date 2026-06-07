@@ -103,8 +103,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterCatAI
   ShowTopMostFoldoutHeaderGroup: 1
-  attackSound: {fileID: 8300000, guid: 66b891f9b845f184088062da92b62274, type: 3}
-  jumpSound: {fileID: 8300000, guid: 4a8216cc4d7cc3946bdfbcebb28acbe6, type: 3}
+  attackSound: {fileID: 8300000, guid: f2c083ee14fa06242948bf0a981d537d, type: 3}
+  jumpSound: {fileID: 8300000, guid: a9ef0db7aa350204fa344778ac271fcc, type: 3}
   stunSound: {fileID: 8300000, guid: 54645beff8fe7ab48a69339821665c31, type: 3}
   detectionRadius: 70
   playerLayer:

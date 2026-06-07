@@ -85,6 +85,7 @@ public class PlayerMovement : NetworkBehaviour
 
     [Header("사운드")]
     private AudioSource audioSource;
+    private AudioSource flyAudioSource;   // 비행 루프 전용 AudioSource
     public AudioClip jump_s;
     public AudioClip damage_s;
     public AudioClip die_s;
@@ -92,7 +93,11 @@ public class PlayerMovement : NetworkBehaviour
     public AudioClip walk_s;
     public AudioClip plop_s;
     public AudioClip land_s;              // 착지 사운드
+    public AudioClip flyStart_s;          // 비행 모드 전환 사운드
+    public AudioClip flyLoop_s;           // 비행 중 이동 바람 사운드 (루프)
+    public AudioClip webStruggle_s;       // 거미줄에 걸린 상태에서 이동 시 사운드
     private float walkSoundTimer = 0.5f;    // 발소리 간격 타이머
+    private float webStruggleSoundTimer = 0f; // 거미줄 발버둥 소리 간격 타이머
     private bool wasGrounded = true;      // 착지 감지용: 이전 프레임 지면 여부
 
     private void Awake()
@@ -101,6 +106,11 @@ public class PlayerMovement : NetworkBehaviour
         animator = GetComponent<Animator>();
         playerSkill = GetComponent<PlayerSkill>();
         audioSource = GetComponent<AudioSource>();
+
+        flyAudioSource = gameObject.AddComponent<AudioSource>();
+        flyAudioSource.loop = true;
+        flyAudioSource.playOnAwake = false;
+        flyAudioSource.spatialBlend = 0f;
     }
 
     public override void OnNetworkSpawn()
@@ -239,6 +249,30 @@ public class PlayerMovement : NetworkBehaviour
                 float speedRatio = Mathf.Max(horizontalSpeed / walkSpeed, 1f);
                 walkSoundTimer = walk_s.length / speedRatio;
             }
+
+            // 비행 중 이동 바람 소리 루프 관리
+            if (flyAudioSource != null && flyLoop_s != null)
+            {
+                bool shouldPlayFlyLoop = isFlying && inputVelocity.magnitude > 0.1f;
+                if (shouldPlayFlyLoop && !flyAudioSource.isPlaying)
+                {
+                    flyAudioSource.clip = flyLoop_s;
+                    flyAudioSource.Play();
+                }
+                else if (!shouldPlayFlyLoop && flyAudioSource.isPlaying)
+                {
+                    flyAudioSource.Stop();
+                }
+            }
+
+            // 거미줄에 걸린 상태에서 이동할 때 발버둥 소리
+            webStruggleSoundTimer -= Time.deltaTime;
+            if (isFlightBlocked.Value && horizontalSpeed > 0.5f
+                && audioSource != null && webStruggle_s != null && webStruggleSoundTimer <= 0f)
+            {
+                audioSource.PlayOneShot(webStruggle_s);
+                webStruggleSoundTimer = webStruggle_s.length;
+            }
         }
         else
         {
@@ -325,8 +359,16 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (Input.GetKeyDown(KeyCode.R))
         {
-            if (!isFlying && currentStamina.Value > 0f && !isFlightBlocked.Value) isFlying = true;
-            else if (isFlying) isFlying = false;
+            if (!isFlying && currentStamina.Value > 0f && !isFlightBlocked.Value)
+            {
+                isFlying = true;
+                if (audioSource != null && flyStart_s != null)
+                    audioSource.PlayOneShot(flyStart_s);
+            }
+            else if (isFlying)
+            {
+                isFlying = false;
+            }
 
             animator.SetBool("flying", isFlying);
         }

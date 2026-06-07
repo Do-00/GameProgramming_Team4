@@ -38,6 +38,11 @@ public class PlayerSkill : NetworkBehaviour
     [SerializeField] private Sprite skillLockedSprite;
     [SerializeField] private Sprite skillUnlockedSprite;
 
+    [Header("사운드")]
+    public AudioClip dashSkill_s;    // 대시 스킬 사용 시 재생
+    public AudioClip searchSkill_s;  // 탐색 스킬 사용 시 재생
+    private AudioSource audioSource;
+
     // 네트워크 변수 (서버 → 모든 클라이언트 동기화)
 
     /// <summary>
@@ -100,6 +105,11 @@ public class PlayerSkill : NetworkBehaviour
     private Coroutine searchCoroutine;
 
     // Unity 이벤트
+
+    private void Awake()
+    {
+        audioSource = GetComponent<AudioSource>();
+    }
 
     private void Update()
     {
@@ -171,6 +181,8 @@ public class PlayerSkill : NetworkBehaviour
         if (Input.GetKeyDown(dashSkillKey) && dashUnlocked.Value && dashCooldownRemaining <= 0f)
         {
             dashCooldownRemaining = dashSkillCooldown;
+            if (audioSource != null && dashSkill_s != null)
+                audioSource.PlayOneShot(dashSkill_s);
             ActivateDashSkillServerRpc();
         }
 
@@ -178,6 +190,8 @@ public class PlayerSkill : NetworkBehaviour
         if (Input.GetKeyDown(searchSkillKey) && searchUnlocked.Value && searchCooldownRemaining <= 0f)
         {
             searchCooldownRemaining = searchCooldown;
+            if (audioSource != null && searchSkill_s != null)
+                audioSource.PlayOneShot(searchSkill_s);
             ActivateSearchSkill();
         }
     }
