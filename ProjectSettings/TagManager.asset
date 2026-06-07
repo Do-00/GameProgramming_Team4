@@ -8,6 +8,7 @@ TagManager:
   - StartButton
   - Enemy
   - Cobweb
+  - Egg
   layers:
   - Default
   - TransparentFX
@@ -21,7 +22,7 @@ TagManager:
   - StartButton
   - Furniture
   - Food
-  - 
+  - Egg
   - 
   - 
   - 

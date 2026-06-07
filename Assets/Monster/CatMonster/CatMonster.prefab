@@ -105,7 +105,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   attackSound: {fileID: 8300000, guid: 66b891f9b845f184088062da92b62274, type: 3}
   jumpSound: {fileID: 8300000, guid: 4a8216cc4d7cc3946bdfbcebb28acbe6, type: 3}
-  stunSound: {fileID: 8300000, guid: 423548eb48faa514bac87ba7613a677d, type: 3}
+  stunSound: {fileID: 8300000, guid: 54645beff8fe7ab48a69339821665c31, type: 3}
   detectionRadius: 70
   playerLayer:
     serializedVersion: 2

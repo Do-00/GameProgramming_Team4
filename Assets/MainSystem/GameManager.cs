@@ -6,51 +6,39 @@ public class GameManager : NetworkBehaviour
     public static GameManager Instance;
 
     [Header("팀원 공유 데이터")]
-    // 팀원들이 추가한 공유 알 개수 (서버만 쓰기 가능, 모두 읽기 가능)
+    // 스킬 상점에서 사용하는 화폐 (할당량 성공 시 환전됨)
     public NetworkVariable<int> sharedEggCount = new NetworkVariable<int>(
         100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    [Header("할당량(Quota) 시스템 설정")]
+    // 현재 진행 중인 라운드 번호
+    public NetworkVariable<int> currentRound = new NetworkVariable<int>(
+        1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    // 이번 라운드에 파리 대왕에게 바쳐야 하는 목표 알 개수
+    public NetworkVariable<int> quotaRequired = new NetworkVariable<int>(
+        10, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    // 이번 라운드에 현재까지 바친 알 개수
+    public NetworkVariable<int> eggsSubmittedThisRound = new NetworkVariable<int>(
+        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     [HideInInspector]
-    public Vector3 startRoomPosition; // MapGenerator가 연산을 끝내고 대입해 줄 실제 집 거실의 좌표
+    public Vector3 startRoomPosition;
 
     [Header("로비 및 맵 설정")]
-    [SerializeField] private GameObject houseMapPrefab; // 생성 및 파괴할 집 맵 프리팹 (NetworkObject 필수)
-    [SerializeField] private Transform lobbySpawnPoint;   // 처음 진입하는 로비(쉘터) 스폰 위치
-    [SerializeField] private Transform playMapSpawnPoint; // 실제 집 맵 프리팹이 생성될 월드 중심 위치
+    [SerializeField] private GameObject houseMapPrefab;
+    [SerializeField] private Transform lobbySpawnPoint;
+    [SerializeField] private Transform playMapSpawnPoint;
 
-    private GameObject spawnedMap; // 관리용 복제본 맵 저장 변수
+    private GameObject spawnedMap;
     private NetworkVariable<bool> isGamePlaying = new NetworkVariable<bool>(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private void Awake()
     {
-        // 싱글톤 패턴 유지
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
     }
 
-    /// <summary>
-    /// [팀원 코드 통합] 아무나 버튼을 눌러 게임을 시작하려고 할 때 호출되는 서버 RPC
-    /// </summary>
-    [ServerRpc(RequireOwnership = false)]
-    public void StartGameServerRpc()
-    {
-        if (!IsServer) return;
-
-        // 이미 게임이 진행 중이 아니라면 라운드 시작
-        if (!isGamePlaying.Value)
-        {
-            StartGameRound();
-        }
-        else
-        {
-            Debug.LogWarning("[시스템] 이미 게임이 진행 중입니다!");
-        }
-    }
-
-    /// <summary>
-    /// 타겟 버튼 상호작용 (게임 시작 또는 로비 복귀 토글)
-    /// </summary>
     [ServerRpc(RequireOwnership = false)]
     public void TargetButtonInteractedServerRpc()
     {
@@ -62,7 +50,7 @@ public class GameManager : NetworkBehaviour
         }
         else
         {
-            ReturnToLobby();
+            EvaluateQuotaAndReturn();
         }
     }
 
@@ -70,7 +58,7 @@ public class GameManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        Debug.Log("[시스템] 게임 시작! 맵 동적 빌드를 시작합니다.");
+        Debug.Log($"[시스템] 라운드 {currentRound.Value} 시작! 목표 알 개수: {quotaRequired.Value}개");
 
         if (houseMapPrefab != null)
         {
@@ -89,12 +77,6 @@ public class GameManager : NetworkBehaviour
                 int masterSeed = Random.Range(1, 100000);
                 mapGen.BuildNewMapFromSeed(masterSeed);
                 BuildFurnitureOnClientRpc(masterSeed);
-
-                Debug.Log($"[시스템] 시드 {masterSeed} 주입 성공! 인테리어 배치를 시작합니다.");
-            }
-            else
-            {
-                Debug.LogError("[에러] 월드에서 MapGenerator 컴포넌트를 찾지 못했습니다! 프리팹을 확인하세요.");
             }
         }
 
@@ -104,18 +86,15 @@ public class GameManager : NetworkBehaviour
 
     private System.Collections.IEnumerator TeleportDelayRoutine()
     {
-        yield return new WaitForSeconds(0.15f); // 맵 지형과 콜라이더가 정렬될 시간 대기
+        yield return new WaitForSeconds(0.15f);
 
         if (playMapSpawnPoint != null)
         {
-            // 지정된 Play Map Spawn Point로 플레이어 전원 이동
             TeleportAllPlayers(playMapSpawnPoint.position + Vector3.up * 1.5f);
-            Debug.Log("[시스템] 플레이어들을 지정된 Play Map Spawn Point로 정상 이동시켰습니다.");
         }
         else
         {
             TeleportAllPlayers(new Vector3(0f, 1002f, 0f));
-            Debug.LogError("[에러] GameManager의 Play Map Spawn Point가 비어있습니다!");
         }
     }
 
@@ -132,22 +111,84 @@ public class GameManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// [서버 권한] 철수 버튼 클릭 시 실행: 플레이어 대피 후 맵, 음식, 적, 거미줄까지 올클리어 청소
+    /// ? [새로 추가됨] 파리 대왕이 알을 흡수할 때 서버에서 호출할 함수
     /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void SubmitEggServerRpc()
+    {
+        if (!IsServer) return;
+
+        eggsSubmittedThisRound.Value += 1;
+        Debug.Log($"[파리대왕] 알 흡수 완료! 현재 제출량: {eggsSubmittedThisRound.Value} / 목표: {quotaRequired.Value}");
+    }
+
+    /// <summary>
+    /// ? [새로 추가됨] 철수 버튼을 눌렀을 때 할당량을 달성했는지 평가하는 함수
+    /// </summary>
+    private void EvaluateQuotaAndReturn()
+    {
+        if (!IsServer) return;
+
+        // 성공 조건: 바친 알이 목표치 이상인 경우
+        if (eggsSubmittedThisRound.Value >= quotaRequired.Value)
+        {
+            Debug.Log($"[시스템] 할당량 달성 성공! 바친 알 {eggsSubmittedThisRound.Value}개가 상점 재화로 환전됩니다.");
+
+            // 바친 알 개수만큼 재화 지급
+            sharedEggCount.Value += eggsSubmittedThisRound.Value;
+
+            // 다음 라운드로 레벨업 및 할당량 증가 계산
+            currentRound.Value += 1;
+            quotaRequired.Value = CalculateNextQuota(currentRound.Value);
+
+            // 라운드 제출량 초기화
+            eggsSubmittedThisRound.Value = 0;
+
+            // 정상적으로 로비 복귀
+            ReturnToLobby();
+        }
+        else
+        {
+            // 실패 조건: 할당량을 채우지 못하고 귀환한 경우 -> 게임 오버
+            TriggerGameOver();
+        }
+    }
+
+    /// <summary>
+    /// ? [새로 추가됨] 라운드가 증가할 때마다 할당량을 점진적으로 올리는 공식
+    /// </summary>
+    private int CalculateNextQuota(int round)
+    {
+        // 1라운드: 10개, 2라운드: 22개, 3라운드: 35개... (점점 무거워지는 밸런스)
+        return 3 + (round - 1) * 5 + (int)(round * 2.5f);
+    }
+
+    /// <summary>
+    /// ? [새로 추가됨] 할당량 미달 시 런을 강제 종료하고 리셋하는 게임 오버 시스템
+    /// </summary>
+    private void TriggerGameOver()
+    {
+        Debug.LogError($"[게임 오버] 파리 대왕을 만족시키지 못했습니다! 최종 라운드: {currentRound.Value}");
+
+        // 모든 진행 데이터 완전 초기화
+        currentRound.Value = 1;
+        quotaRequired.Value = 3;
+        eggsSubmittedThisRound.Value = 0;
+        sharedEggCount.Value = 0; // 초기 자금으로 리셋
+
+        // 강제 청소 및 로비 사지(쉘터)로 사출
+        ReturnToLobby();
+    }
+
     private void ReturnToLobby()
     {
         if (!IsServer) return;
 
-        Debug.Log("[시스템] 작전 종료! 모든 파리를 본부 로비로 철수시키고 지형 및 잔해물 청소를 시작합니다.");
-
-        // 1. 모든 플레이어들을 처음 시작했던 로비(쉘터) 스폰 포인트로 원격 이동
         if (lobbySpawnPoint != null) TeleportAllPlayers(lobbySpawnPoint.position + Vector3.up * 1f);
         else TeleportAllPlayers(new Vector3(0f, 1.5f, 0f));
 
-        // 2. 필드에 남겨진 모든 동적 넷코드 오브젝트 청소
         CleanUpAllSpawnedObjects();
 
-        // 3. 생성되어 필드에 남아있던 집 맵 프리팹 파괴
         if (spawnedMap != null)
         {
             NetworkObject mapNetObj = spawnedMap.GetComponent<NetworkObject>();
@@ -168,11 +209,9 @@ public class GameManager : NetworkBehaviour
         CleanUpTags("Food");
         CleanUpTags("Enemy");
         CleanUpTags("Cobweb");
-
-        Debug.Log("[시스템] 필드 잔해물(음식, 적, 거미줄) 클리어 완료.");
+        CleanUpTags("Egg"); // ? 들고 오지 못하고 던져진 필드의 알들도 다음 판을 위해 깔끔히 청소
     }
 
-    // 중복되는 청소 코드를 하나로 묶은 최적화 메서드
     private void CleanUpTags(string tagName)
     {
         GameObject[] objects = GameObject.FindGameObjectsWithTag(tagName);

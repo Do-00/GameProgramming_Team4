@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 [RequireComponent(typeof(Rigidbody))]
 public class PlayerMovement : NetworkBehaviour
-{   
+{
     [Header("이동 설정")]
     [SerializeField] private float walkSpeed = 10f;      // 걷는 속도
     [SerializeField] private float sprintSpeed = 15f;     // 달리는 속도
@@ -13,8 +13,8 @@ public class PlayerMovement : NetworkBehaviour
 
     [Header("점프 & 대쉬 설정")]
     [SerializeField] private float jumpForce = 15f;     // 점프 거리
-    [SerializeField] private float fallMultiplier = 4f; // 낙하 가속도                -------- 새로 추가함
-    [SerializeField] private float upwardMultiplier = 2.5f;  // 상승 가속도                -------- 새로 추가함
+    [SerializeField] private float fallMultiplier = 4f; // 낙하 가속도
+    [SerializeField] private float upwardMultiplier = 2.5f;  // 상승 가속도
     [SerializeField] private float dashSpeed = 40f;    // 대쉬 속도
     [SerializeField] private float groundDashDuration = 0.2f; // 지상 대쉬 지속 시간
     [SerializeField] private float flyDashDuration = 0.15f;  // 비행 대쉬 지속 시간
@@ -40,13 +40,13 @@ public class PlayerMovement : NetworkBehaviour
     [Header("UI 설정")]
     [SerializeField] private GameObject playerUICanvas; // 내 화면에서만 켤 캔버스
     [SerializeField] private Slider staminaSlider;      // 스태미너 바 슬라이더
-    [SerializeField] private Slider healthSlider;       //  체력 바 슬라이더
+    [SerializeField] private Slider healthSlider;       // 체력 바 슬라이더
     [SerializeField] private Slider satietySlider;      // 포만감 바 슬라이더
 
     // 서버가 엄격하게 관리하고 클라이언트들에게 실시간 복제할 네트워크 변수들
     public NetworkVariable<float> currentStamina = new NetworkVariable<float>(20f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public NetworkVariable<bool> isFlightBlocked = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    public NetworkVariable<float> currentHealth = new NetworkVariable<float>(100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server); // ✨ 체력 네트워크 변수
+    public NetworkVariable<float> currentHealth = new NetworkVariable<float>(100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     private float blockTimer = 0f;
 
     [Header("카메라 설정")]
@@ -57,13 +57,17 @@ public class PlayerMovement : NetworkBehaviour
 
     [Header("에너지 & 상호작용 설정")]
     public NetworkVariable<int> currentEnergy = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    [SerializeField] private int maxEnergy = 100; //  최대 포만감(에너지) 제한치
+    [SerializeField] private int maxEnergy = 100; // 최대 포만감(에너지) 제한치
     [SerializeField] private GameObject eggPrefab;
     [SerializeField] private float interactDistance = 4f; // 음식 섭취 최대 사거리
     [SerializeField] private float eatDuration = 3f; // 섭취에 걸리는 시간
     private Outline currentlyHighlightedFood; // 현재 하이라이트 중인 음식
     private float eatTimer = 0f;                     // 현재 얼마나 먹었는지 측정
     private bool isEating = false;                   // 현재 먹고 있는 중인지
+
+    [Header("알 운반 설정")]
+    [SerializeField] private Transform holdPoint; // 카메라의 자식으로 둔 빈 오브젝트 (알을 들 위치)
+    private NetworkObject carriedEgg = null;      // 현재 들고 있는 알
 
     private bool isFlying = false;  // 날고 있는지 여부 (서버가 관리)
     private float xRotation = 0f;  // 카메라의 수직 회전값 (서버가 관리)
@@ -79,7 +83,8 @@ public class PlayerMovement : NetworkBehaviour
     private Vector3 dashDirection;    // 대쉬 방향 (서버가 관리)
     private float currentDashSpeed = 0f;  // 현재 대쉬 속도 (서버가 관리)
 
-    private AudioSource audioSource; // 사 운 드
+    [Header("사운드")]
+    private AudioSource audioSource;
     public AudioClip jump_s;
     public AudioClip damage_s;
     public AudioClip die_s;
@@ -87,7 +92,7 @@ public class PlayerMovement : NetworkBehaviour
     public AudioClip walk_s;
     public AudioClip plop_s;
     public AudioClip land_s;              // 착지 사운드
-    private float walkSoundTimer = 0f;    // 발소리 간격 타이머
+    private float walkSoundTimer = 0.5f;    // 발소리 간격 타이머
     private bool wasGrounded = true;      // 착지 감지용: 이전 프레임 지면 여부
 
     private void Awake()
@@ -95,7 +100,7 @@ public class PlayerMovement : NetworkBehaviour
         rb = GetComponent<Rigidbody>();
         animator = GetComponent<Animator>();
         playerSkill = GetComponent<PlayerSkill>();
-        audioSource = GetComponent<AudioSource>(); // ← 초기화 추가
+        audioSource = GetComponent<AudioSource>();
     }
 
     public override void OnNetworkSpawn()
@@ -121,7 +126,6 @@ public class PlayerMovement : NetworkBehaviour
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
             }
 
-            // 내 화면의 UI와 슬라이더 기본값 초기화 세팅
             if (playerUICanvas != null) playerUICanvas.SetActive(true);
             if (staminaSlider != null)
             {
@@ -167,18 +171,9 @@ public class PlayerMovement : NetworkBehaviour
                 return;
             }
 
-            if (staminaSlider != null)
-            {
-                staminaSlider.value = currentStamina.Value;
-            }
-            if (healthSlider != null)
-            {
-                healthSlider.value = currentHealth.Value;
-            }
-            if (satietySlider != null)
-            {
-                satietySlider.value = currentEnergy.Value;
-            }
+            if (staminaSlider != null) staminaSlider.value = currentStamina.Value;
+            if (healthSlider != null) healthSlider.value = currentHealth.Value;
+            if (satietySlider != null) satietySlider.value = currentEnergy.Value;
 
             if (currentStamina.Value <= 0f || isFlightBlocked.Value)
             {
@@ -191,28 +186,31 @@ public class PlayerMovement : NetworkBehaviour
             HandleAimHighlight();
             HandleEatingProgress();
 
-            // E 키 상호작용 (버튼 누르기 or 알 낳기)
             if (Input.GetKeyDown(KeyCode.E))
             {
-                // 먼저 광선을 쏴서 시작 버튼을 바라보고 있는지 확인
+                if (carriedEgg != null)
+                {
+                    DropEggServerRpc(carriedEgg);
+                    return;
+                }
+
                 Ray ray = playerCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
                 if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
                 {
                     if (hit.collider.CompareTag("StartButton"))
                     {
-                        // 게임 시작 버튼을 눌렀다면 서버에 시작 명령을 내리고 리턴(알 낳기 취소)
-                        GameManager.Instance.StartGameServerRpc();
+                        GameManager.Instance.TargetButtonInteractedServerRpc();
                         return;
                     }
-                }
-
-                // 버튼을 바라본 게 아니라면 기존처럼 에너지를 확인하고 알을 낳음
-                if (currentEnergy.Value >= 1)
-                {
-                    if (audioSource != null && plop_s != null)
-                        audioSource.PlayOneShot(plop_s);
-
-                    LayEggsServerRpc(ShelterZone.IsLocalPlayerInShelter);
+                    else if (hit.collider.CompareTag("Egg"))
+                    {
+                        NetworkObject eggNetObj = hit.collider.GetComponent<NetworkObject>();
+                        if (eggNetObj != null)
+                        {
+                            GrabEggServerRpc(eggNetObj);
+                            return;
+                        }
+                    }
                 }
             }
 
@@ -227,21 +225,17 @@ public class PlayerMovement : NetworkBehaviour
 
             bool grounded = IsGrounded();
 
-            // 착지 사운드: 이전 프레임 공중 → 이번 프레임 착지 (비행/대쉬/점프 제외)
-            if (grounded && !wasGrounded && !isFlying && !isDashing
-                && audioSource != null && land_s != null)
+            if (grounded && !wasGrounded && !isFlying && !isDashing && audioSource != null && land_s != null)
             {
                 audioSource.PlayOneShot(land_s);
             }
             wasGrounded = grounded;
 
-            // 발소리: 땅 위에서 이동 중일 때 속도에 비례해 간격이 줄어듦
             walkSoundTimer -= Time.deltaTime;
             if (!isFlying && !isDashing && grounded && horizontalSpeed > 1f
                 && audioSource != null && walk_s != null && walkSoundTimer <= 0f)
             {
                 audioSource.PlayOneShot(walk_s);
-                // 속도가 빠를수록 간격이 짧아짐 (walkSpeed 기준 정규화)
                 float speedRatio = Mathf.Max(horizontalSpeed / walkSpeed, 1f);
                 walkSoundTimer = walk_s.length / speedRatio;
             }
@@ -256,8 +250,6 @@ public class PlayerMovement : NetworkBehaviour
     void FixedUpdate()
     {
         if (!IsOwner) return;
-
-        // ✨ [수정됨 1번] 중복 호출을 제거하고, 죽었을 때 물리 이동 명령을 보내지 않도록 수정!
         if (isDead.Value) return;
 
         SubmitMovementServerRpc(inputVelocity, isFlying);
@@ -278,10 +270,7 @@ public class PlayerMovement : NetworkBehaviour
         PlaySoundClientRpc("damage");
         Debug.Log($"[{gameObject.name}] 맞았습니다! 남은 체력: {currentHealth.Value}");
 
-        if (currentHealth.Value <= 0f)
-        {
-            Die();
-        }
+        if (currentHealth.Value <= 0f) Die();
     }
 
     private void Die()
@@ -293,7 +282,6 @@ public class PlayerMovement : NetworkBehaviour
         PlaySoundClientRpc("die");
 
         SetDeathStateClientRpc(true);
-
         Debug.Log($"[{gameObject.name}] 파리 사망! 누적 데스: {deathCount.Value}");
     }
 
@@ -303,10 +291,7 @@ public class PlayerMovement : NetworkBehaviour
         Renderer[] renderers = GetComponentsInChildren<Renderer>();
         foreach (Renderer r in renderers) r.enabled = !deathState;
 
-        if (deathState)
-        {
-            rb.linearVelocity = Vector3.zero;
-        }
+        if (deathState) rb.linearVelocity = Vector3.zero;
         rb.isKinematic = deathState;
 
         Collider col = GetComponent<Collider>();
@@ -340,14 +325,8 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (Input.GetKeyDown(KeyCode.R))
         {
-            if (!isFlying && currentStamina.Value > 0f && !isFlightBlocked.Value)
-            {
-                isFlying = true;
-            }
-            else if (isFlying)
-            {
-                isFlying = false;
-            }
+            if (!isFlying && currentStamina.Value > 0f && !isFlightBlocked.Value) isFlying = true;
+            else if (isFlying) isFlying = false;
 
             animator.SetBool("flying", isFlying);
         }
@@ -430,26 +409,19 @@ public class PlayerMovement : NetworkBehaviour
     [ServerRpc]
     private void SubmitMovementServerRpc(Vector3 velocity, bool flyingState)
     {
-        // [수정됨 2번] 방어막을 밖으로 꺼내서 가장 윗줄에 배치하여 완벽하게 방어!
         if (isDead.Value || rb.isKinematic) return;
 
         if (isFlightBlocked.Value)
         {
             blockTimer -= Time.fixedDeltaTime;
-            if (blockTimer <= 0f)
-            {
-                isFlightBlocked.Value = false;
-            }
+            if (blockTimer <= 0f) isFlightBlocked.Value = false;
             flyingState = false;
         }
 
         if (flyingState)
         {
             currentStamina.Value = Mathf.Max(0f, currentStamina.Value - (staminaDrainRate * Time.fixedDeltaTime));
-            if (currentStamina.Value <= 0f)
-            {
-                flyingState = false;
-            }
+            if (currentStamina.Value <= 0f) flyingState = false;
         }
         else if (Physics.Raycast(transform.position, Vector3.down, groundCheckDistance))
         {
@@ -466,24 +438,32 @@ public class PlayerMovement : NetworkBehaviour
             else rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         }
 
+        // ✨ [다시 추가된 중력 가속도 보정 로직]
+        if (!flyingState)
+        {
+            // 떨어질 때 더 빨리 떨어지도록 (fallMultiplier 적용)
+            if (rb.linearVelocity.y < 0)
+            {
+                rb.linearVelocity += Vector3.up * Physics.gravity.y * (fallMultiplier - 1f) * Time.fixedDeltaTime;
+            }
+            // 상승 중일 때도 묵직함을 주기 위해 가속도 보정 (upwardMultiplier 적용)
+            else if (rb.linearVelocity.y > 0)
+            {
+                rb.linearVelocity += Vector3.up * Physics.gravity.y * (upwardMultiplier - 1f) * Time.fixedDeltaTime;
+            }
+        }
+
         float mult = (playerSkill != null) ? playerSkill.speedMultiplier.Value : 1f;
 
-        if (flyingState)
-        {
-            rb.linearVelocity = velocity * mult; // ← * mult 추가
-        }
-        else
-        {
-            rb.linearVelocity = new Vector3(velocity.x * mult, rb.linearVelocity.y, velocity.z * mult); // ← * mult 추가
-        }
+        if (flyingState) rb.linearVelocity = velocity * mult;
+        else rb.linearVelocity = new Vector3(velocity.x * mult, rb.linearVelocity.y, velocity.z * mult);
     }
 
-        [ServerRpc]
-        private void SubmitRotationServerRpc(float yRot)
-        {
-            netYRot.Value = yRot;
-        }
-    
+    [ServerRpc]
+    private void SubmitRotationServerRpc(float yRot)
+    {
+        netYRot.Value = yRot;
+    }
 
     private void HandleAimHighlight()
     {
@@ -491,14 +471,14 @@ public class PlayerMovement : NetworkBehaviour
 
         if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
         {
-            if (hit.collider.CompareTag("Food"))
+            if (hit.collider.CompareTag("Food") || hit.collider.CompareTag("Egg"))
             {
-                Outline foodOutline = hit.collider.GetComponent<Outline>();
+                Outline outline = hit.collider.GetComponent<Outline>();
 
-                if (foodOutline != null && foodOutline != currentlyHighlightedFood)
+                if (outline != null && outline != currentlyHighlightedFood)
                 {
                     DisableCurrentHighlight();
-                    currentlyHighlightedFood = foodOutline;
+                    currentlyHighlightedFood = outline;
                     currentlyHighlightedFood.enabled = true;
                 }
                 return;
@@ -528,51 +508,9 @@ public class PlayerMovement : NetworkBehaviour
                 NetworkObject foodNetObj = hit.collider.GetComponent<NetworkObject>();
                 if (foodNetObj != null)
                 {
-                    EatFoodServerRpc(foodNetObj);
-
+                    EatFoodServerRpc(foodNetObj, ShelterZone.IsLocalPlayerInShelter);
                 }
             }
-        }
-    }
-
-    [ServerRpc]
-    private void EatFoodServerRpc(NetworkObjectReference foodRef)
-    {
-        if (foodRef.TryGet(out NetworkObject foodNetObj))
-        {
-            if (IsOwner) DisableCurrentHighlight();
-
-            currentEnergy.Value = Mathf.Min(maxEnergy, currentEnergy.Value + 10);
-            foodNetObj.Despawn(false);
-            PlaySoundClientRpc("eat");
-            Debug.Log("[Server] Food eaten! Energy: " + currentEnergy.Value); // 음식섭취
-        }
-    }
-
-    [ServerRpc]
-    private void LayEggsServerRpc(bool isInShelter)
-    {
-        if (currentEnergy.Value < 1 || eggPrefab == null)
-        {
-            Debug.Log($"[서버] 에너지 부족 | 에너지: {currentEnergy.Value}");
-            return;
-        }
-        currentEnergy.Value -= 1;
-
-        if (isInShelter)
-        {
-            // 화폐 알 — 스폰 없이 카운트만
-            GameManager.Instance.sharedEggCount.Value += 1;
-            Debug.Log($"[서버] 쉘터 알(화폐) +1 | 총: {GameManager.Instance.sharedEggCount.Value} | 에너지: {currentEnergy.Value}");
-        }
-        else
-        {
-            // 일반 알 — 월드에 스폰
-            Vector3 spawnPos = transform.position - transform.forward * 0.5f
-                + Vector3.up * 0.2f + Random.insideUnitSphere * 0.1f;
-            GameObject newEgg = Instantiate(eggPrefab, spawnPos, Quaternion.identity);
-            newEgg.GetComponent<NetworkObject>().Spawn();
-            Debug.Log($"[서버] 일반 알 스폰 | 에너지: {currentEnergy.Value}");
         }
     }
 
@@ -588,7 +526,7 @@ public class PlayerMovement : NetworkBehaviour
                 NetworkObject foodNetObj = currentlyHighlightedFood.GetComponent<NetworkObject>();
                 if (foodNetObj != null)
                 {
-                    EatFoodServerRpc(foodNetObj);
+                    EatFoodServerRpc(foodNetObj, ShelterZone.IsLocalPlayerInShelter);
                 }
                 ResetEating();
             }
@@ -605,12 +543,43 @@ public class PlayerMovement : NetworkBehaviour
         eatTimer = 0f;
     }
 
+    [ServerRpc]
+    private void EatFoodServerRpc(NetworkObjectReference foodRef, bool isInShelter)
+    {
+        if (foodRef.TryGet(out NetworkObject foodNetObj))
+        {
+            if (IsOwner) DisableCurrentHighlight();
+
+            currentEnergy.Value = Mathf.Min(maxEnergy, currentEnergy.Value + 50);
+            foodNetObj.Despawn(false);
+            PlaySoundClientRpc("eat");
+            Debug.Log("[Server] Food eaten! Energy: " + currentEnergy.Value);
+
+            if (currentEnergy.Value >= maxEnergy)
+            {
+                currentEnergy.Value = 0;
+                PlaySoundClientRpc("plop");
+
+                if (isInShelter)
+                {
+                    GameManager.Instance.sharedEggCount.Value += 1;
+                    Debug.Log($"[서버] 쉘터 안에서 자동 알 생성(화폐) +1 | 총: {GameManager.Instance.sharedEggCount.Value}");
+                }
+                else
+                {
+                    Vector3 spawnPos = transform.position - transform.forward * 0.5f
+                        + Vector3.up * 0.2f + Random.insideUnitSphere * 0.1f;
+                    GameObject newEgg = Instantiate(eggPrefab, spawnPos, Quaternion.identity);
+                    newEgg.GetComponent<NetworkObject>().Spawn();
+                    Debug.Log("[서버] 밖에서 일반 알 자동 스폰 완료");
+                }
+            }
+        }
+    }
+
     private void HandleSpectatorInput()
     {
-        if (Input.GetMouseButtonDown(0))
-        {
-            SwitchSpectateTarget();
-        }
+        if (Input.GetMouseButtonDown(0)) SwitchSpectateTarget();
 
         if (spectateTarget != null)
         {
@@ -626,10 +595,7 @@ public class PlayerMovement : NetworkBehaviour
 
         foreach (var p in allPlayers)
         {
-            if (!p.isDead.Value && p != this)
-            {
-                aliveTeammates.Add(p);
-            }
+            if (!p.isDead.Value && p != this) aliveTeammates.Add(p);
         }
 
         if (aliveTeammates.Count > 0)
@@ -643,32 +609,86 @@ public class PlayerMovement : NetworkBehaviour
             Debug.Log("살아있는 팀원이 없음... 게임 오버 대기 중.");
         }
     }
-    // 서버에서 호출 → 모든 클라이언트에서 해당 사운드 재생
+
     [ClientRpc]
     private void PlaySoundClientRpc(string clipName)
     {
         AudioClip clip = clipName switch
         {
             "damage" => damage_s,
-            "die"    => die_s,
-            "eat"    => eat_s,
-            "plop"   => plop_s,
-            _        => null
+            "die" => die_s,
+            "eat" => eat_s,
+            "plop" => plop_s,
+            _ => null
         };
         if (audioSource != null && clip != null)
             audioSource.PlayOneShot(clip);
     }
 
+    [ServerRpc]
+    private void GrabEggServerRpc(NetworkObjectReference eggRef)
+    {
+        if (eggRef.TryGet(out NetworkObject eggNetObj))
+        {
+            if (eggNetObj.TryGetComponent(out Rigidbody rb) && rb.isKinematic) return;
+
+            eggNetObj.ChangeOwnership(OwnerClientId);
+            GrabEggClientRpc(eggRef);
+        }
+    }
+
+    [ClientRpc]
+    private void GrabEggClientRpc(NetworkObjectReference eggRef)
+    {
+        if (eggRef.TryGet(out NetworkObject eggNetObj))
+        {
+            if (eggNetObj.TryGetComponent(out Rigidbody rb)) rb.isKinematic = true;
+            if (eggNetObj.TryGetComponent(out Collider col)) col.enabled = false;
+
+            carriedEgg = eggNetObj;
+        }
+    }
+
+    [ServerRpc]
+    private void DropEggServerRpc(NetworkObjectReference eggRef)
+    {
+        if (eggRef.TryGet(out NetworkObject eggNetObj))
+        {
+            eggNetObj.RemoveOwnership();
+            DropEggClientRpc(eggRef);
+        }
+    }
+
+    [ClientRpc]
+    private void DropEggClientRpc(NetworkObjectReference eggRef)
+    {
+        if (eggRef.TryGet(out NetworkObject eggNetObj))
+        {
+            carriedEgg = null;
+
+            if (eggNetObj.TryGetComponent(out Collider col)) col.enabled = true;
+            if (eggNetObj.TryGetComponent(out Rigidbody rb))
+            {
+                rb.isKinematic = false;
+                if (IsOwner) rb.AddForce(playerCamera.transform.forward * 3f, ForceMode.Impulse);
+            }
+        }
+    }
+
+    private void LateUpdate()
+    {
+        if (carriedEgg != null && holdPoint != null)
+        {
+            carriedEgg.transform.position = holdPoint.position;
+            carriedEgg.transform.rotation = holdPoint.rotation;
+        }
+    }
+
     [ClientRpc]
     public void TeleportClientRpc(Vector3 targetPosition)
     {
-        // 물리 엔진(Rigidbody)이 켜져 있으면 강제 이동 시 튕겨 나갈 수 있으므로 잠깐 끕니다.
         rb.isKinematic = true;
-
-        // 바닥에 파고들지 않도록 Y축으로 살짝 위(예: 1.5f)로 띄워서 텔레포트
         transform.position = targetPosition + Vector3.up * 1.5f;
-
-        // 이동 완료 후 다시 물리 엔진 가동
         rb.isKinematic = false;
     }
 }
