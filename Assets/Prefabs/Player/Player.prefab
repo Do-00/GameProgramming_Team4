@@ -697,10 +697,10 @@ RectTransform:
   - {fileID: 212162750768738205}
   m_Father: {fileID: 9190760892362934450}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 445, y: 173}
-  m_SizeDelta: {x: 220.6, y: 30}
+  m_AnchorMin: {x: 1, y: 1}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: -110.29999, y: -24.27}
+  m_SizeDelta: {x: 220.59998, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4859454302383960582
 CanvasRenderer:
@@ -1788,8 +1788,8 @@ GameObject:
   - component: {fileID: 5852207011137598640}
   - component: {fileID: 6074832100507803630}
   - component: {fileID: 7696286077123488597}
-  - component: {fileID: 781865980207866634}
   - component: {fileID: -6543303954407692920}
+  - component: {fileID: 8170276432450524225}
   m_Layer: 3
   m_Name: Player
   m_TagString: Player
@@ -1814,6 +1814,7 @@ Transform:
   - {fileID: 2352978005673374009}
   - {fileID: 9190760892362934450}
   - {fileID: 7582415515768436162}
+  - {fileID: 5208294701784456145}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!23 &7645752991948801712
@@ -1877,7 +1878,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3717911331
+  GlobalObjectIdHash: 2815931923
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -2064,8 +2065,15 @@ MonoBehaviour:
       MinSecondsBetweenUpdates: 0
       MaxSecondsBetweenUpdates: 0
     m_InternalValue: 0
+  timeOfDeath:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
   maxHealth: 100
   playerUICanvas: {fileID: 3714700952287553699}
+  GameScreenView: {fileID: 6066721014639387369}
+  QuotaText: {fileID: 3623363990511142702}
   staminaSlider: {fileID: 4532499291577687050}
   healthSlider: {fileID: 2107743998440778834}
   satietySlider: {fileID: 2585796958233229614}
@@ -2178,65 +2186,6 @@ CapsuleCollider:
   m_Height: 1.58
   m_Direction: 1
   m_Center: {x: 0, y: -0.2, z: 0.06}
---- !u!114 &781865980207866634
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7820289106922720799}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 57725528ecc1c6a4f80808f2fcb227aa, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerSkill
-  ShowTopMostFoldoutHeaderGroup: 1
-  dashSkillKey: 113
-  dashSpeedMultiplier: 3.5
-  dashSkillDuration: 1.2
-  dashSkillCooldown: 6
-  searchSkillKey: 103
-  searchRadius: 25
-  searchDuration: 4
-  searchCooldown: 12
-  foodLayer:
-    serializedVersion: 2
-    m_Bits: 2048
-  dashSkillData: {fileID: 11400000, guid: cc89fc4511aa8974f8da2451f92f5376, type: 2}
-  searchSkillData: {fileID: 11400000, guid: bed7740d521203142b641119ac22e335, type: 2}
-  dashCooldownSlider: {fileID: 0}
-  searchCooldownSlider: {fileID: 0}
-  dashSlotBg: {fileID: 2189255600019816126}
-  dashSkillIcon: {fileID: 4955226371918446512}
-  searchSlotBg: {fileID: 3747611176860276646}
-  searchSkillIcon: {fileID: 447704487627604749}
-  skillLockedSprite: {fileID: 21300000, guid: 887f2ef956e34e644877763e00f85457, type: 3}
-  skillUnlockedSprite: {fileID: 21300000, guid: 394e5824128ce9b4593d6bb58aae7089, type: 3}
-  speedMultiplier:
-    UpdateTraits:
-      MinSecondsBetweenUpdates: 0
-      MaxSecondsBetweenUpdates: 0
-    m_InternalValue: 1
-  dashUnlocked:
-    UpdateTraits:
-      MinSecondsBetweenUpdates: 0
-      MaxSecondsBetweenUpdates: 0
-    m_InternalValue: 0
-  searchUnlocked:
-    UpdateTraits:
-      MinSecondsBetweenUpdates: 0
-      MaxSecondsBetweenUpdates: 0
-    m_InternalValue: 0
-  dashUpgradeLevel:
-    UpdateTraits:
-      MinSecondsBetweenUpdates: 0
-      MaxSecondsBetweenUpdates: 0
-    m_InternalValue: 2
-  searchUpgradeLevel:
-    UpdateTraits:
-      MinSecondsBetweenUpdates: 0
-      MaxSecondsBetweenUpdates: 0
-    m_InternalValue: 2
 --- !u!82 &-6543303954407692920
 AudioSource:
   m_ObjectHideFlags: 0
@@ -2334,6 +2283,65 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &8170276432450524225
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7820289106922720799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 57725528ecc1c6a4f80808f2fcb227aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerSkill
+  ShowTopMostFoldoutHeaderGroup: 1
+  dashSkillKey: 113
+  dashSpeedMultiplier: 3.5
+  dashSkillDuration: 1.2
+  dashSkillCooldown: 6
+  searchSkillKey: 103
+  searchRadius: 25
+  searchDuration: 4
+  searchCooldown: 12
+  foodLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  dashSkillData: {fileID: 11400000, guid: cc89fc4511aa8974f8da2451f92f5376, type: 2}
+  searchSkillData: {fileID: 11400000, guid: bed7740d521203142b641119ac22e335, type: 2}
+  dashCooldownSlider: {fileID: 0}
+  searchCooldownSlider: {fileID: 0}
+  dashSlotBg: {fileID: 2189255600019816126}
+  dashSkillIcon: {fileID: 4955226371918446512}
+  searchSlotBg: {fileID: 3747611176860276646}
+  searchSkillIcon: {fileID: 447704487627604749}
+  skillLockedSprite: {fileID: 21300000, guid: 887f2ef956e34e644877763e00f85457, type: 3}
+  skillUnlockedSprite: {fileID: 21300000, guid: 394e5824128ce9b4593d6bb58aae7089, type: 3}
+  speedMultiplier:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 1
+  dashUnlocked:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  searchUnlocked:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  dashUpgradeLevel:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  searchUpgradeLevel:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
 --- !u!1 &8050088207021697816
 GameObject:
   m_ObjectHideFlags: 0
@@ -2591,6 +2599,133 @@ Transform:
   - {fileID: 5623535212834317592}
   m_Father: {fileID: 3678829343933915857}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &9063523953828591207
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5208294701784456145}
+  - component: {fileID: 8990399799906242637}
+  - component: {fileID: 7689785359794434654}
+  m_Layer: 3
+  m_Name: BodyLight
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5208294701784456145
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9063523953828591207}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.35, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1590703204706257356}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!108 &8990399799906242637
+Light:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9063523953828591207}
+  m_Enabled: 1
+  serializedVersion: 12
+  m_Type: 2
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Intensity: 30
+  m_Range: 30
+  m_SpotAngle: 30
+  m_InnerSpotAngle: 21.80208
+  m_CookieSize2D: {x: 0.5, y: 0.5}
+  m_Shadows:
+    m_Type: 0
+    m_Resolution: -1
+    m_CustomResolution: -1
+    m_Strength: 1
+    m_Bias: 0.05
+    m_NormalBias: 0.4
+    m_NearPlane: 0.2
+    m_CullingMatrixOverride:
+      e00: 1
+      e01: 0
+      e02: 0
+      e03: 0
+      e10: 0
+      e11: 1
+      e12: 0
+      e13: 0
+      e20: 0
+      e21: 0
+      e22: 1
+      e23: 0
+      e30: 0
+      e31: 0
+      e32: 0
+      e33: 1
+    m_UseCullingMatrixOverride: 0
+  m_Cookie: {fileID: 0}
+  m_DrawHalo: 0
+  m_Flare: {fileID: 0}
+  m_RenderMode: 0
+  m_CullingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_RenderingLayerMask: 1
+  m_Lightmapping: 4
+  m_LightShadowCasterMode: 0
+  m_AreaSize: {x: 1, y: 1}
+  m_BounceIntensity: 1
+  m_ColorTemperature: 6570
+  m_UseColorTemperature: 0
+  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_UseBoundingSphereOverride: 0
+  m_UseViewFrustumForShadowCasterCull: 1
+  m_ForceVisible: 0
+  m_ShadowRadius: 0
+  m_ShadowAngle: 0
+  m_LightUnit: 1
+  m_LuxAtDistance: 1
+  m_EnableSpotReflector: 1
+--- !u!114 &7689785359794434654
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9063523953828591207}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1001 &7130304365006141678
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -1,23 +1,24 @@
 using Unity.Netcode;
 using UnityEngine;
+using System.Collections;
 
 public class GameManager : NetworkBehaviour
 {
     public static GameManager Instance;
 
+    [Header("UI 연동")]
+    // ? [새로 추가됨] 인스펙터에서 GameOverManager를 드래그해서 연결해주세요.
+    [SerializeField] private GameOverManager gameOverManager;
+
     [Header("팀원 공유 데이터")]
-    // 스킬 상점에서 사용하는 화폐 (할당량 성공 시 환전됨)
     public NetworkVariable<int> sharedEggCount = new NetworkVariable<int>(
         100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     [Header("할당량(Quota) 시스템 설정")]
-    // 현재 진행 중인 라운드 번호
     public NetworkVariable<int> currentRound = new NetworkVariable<int>(
         1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    // 이번 라운드에 파리 대왕에게 바쳐야 하는 목표 알 개수
     public NetworkVariable<int> quotaRequired = new NetworkVariable<int>(
         10, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    // 이번 라운드에 현재까지 바친 알 개수
     public NetworkVariable<int> eggsSubmittedThisRound = new NetworkVariable<int>(
         0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
@@ -84,7 +85,7 @@ public class GameManager : NetworkBehaviour
         isGamePlaying.Value = true;
     }
 
-    private System.Collections.IEnumerator TeleportDelayRoutine()
+    private IEnumerator TeleportDelayRoutine()
     {
         yield return new WaitForSeconds(0.15f);
 
@@ -110,9 +111,6 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    /// <summary>
-    /// ? [새로 추가됨] 파리 대왕이 알을 흡수할 때 서버에서 호출할 함수
-    /// </summary>
     [ServerRpc(RequireOwnership = false)]
     public void SubmitEggServerRpc()
     {
@@ -122,62 +120,68 @@ public class GameManager : NetworkBehaviour
         Debug.Log($"[파리대왕] 알 흡수 완료! 현재 제출량: {eggsSubmittedThisRound.Value} / 목표: {quotaRequired.Value}");
     }
 
-    /// <summary>
-    /// ? [새로 추가됨] 철수 버튼을 눌렀을 때 할당량을 달성했는지 평가하는 함수
-    /// </summary>
     private void EvaluateQuotaAndReturn()
     {
         if (!IsServer) return;
 
-        // 성공 조건: 바친 알이 목표치 이상인 경우
         if (eggsSubmittedThisRound.Value >= quotaRequired.Value)
         {
             Debug.Log($"[시스템] 할당량 달성 성공! 바친 알 {eggsSubmittedThisRound.Value}개가 상점 재화로 환전됩니다.");
 
-            // 바친 알 개수만큼 재화 지급
             sharedEggCount.Value += eggsSubmittedThisRound.Value;
-
-            // 다음 라운드로 레벨업 및 할당량 증가 계산
             currentRound.Value += 1;
             quotaRequired.Value = CalculateNextQuota(currentRound.Value);
-
-            // 라운드 제출량 초기화
             eggsSubmittedThisRound.Value = 0;
 
-            // 정상적으로 로비 복귀
             ReturnToLobby();
         }
         else
         {
-            // 실패 조건: 할당량을 채우지 못하고 귀환한 경우 -> 게임 오버
             TriggerGameOver();
         }
     }
 
-    /// <summary>
-    /// ? [새로 추가됨] 라운드가 증가할 때마다 할당량을 점진적으로 올리는 공식
-    /// </summary>
     private int CalculateNextQuota(int round)
     {
-        // 1라운드: 10개, 2라운드: 22개, 3라운드: 35개... (점점 무거워지는 밸런스)
         return 3 + (round - 1) * 5 + (int)(round * 2.5f);
     }
 
-    /// <summary>
-    /// ? [새로 추가됨] 할당량 미달 시 런을 강제 종료하고 리셋하는 게임 오버 시스템
-    /// </summary>
-    private void TriggerGameOver()
+    public void TriggerGameOver()
     {
-        Debug.LogError($"[게임 오버] 파리 대왕을 만족시키지 못했습니다! 최종 라운드: {currentRound.Value}");
+        Debug.Log($"[게임 오버] 파리 대왕을 만족시키지 못했습니다! (또는 전멸) 최종 라운드: {currentRound.Value}");
 
-        // 모든 진행 데이터 완전 초기화
         currentRound.Value = 1;
         quotaRequired.Value = 3;
         eggsSubmittedThisRound.Value = 0;
-        sharedEggCount.Value = 0; // 초기 자금으로 리셋
+        sharedEggCount.Value = 0;
 
-        // 강제 청소 및 로비 사지(쉘터)로 사출
+        // ? [수정됨] UI 매니저 호출 및 로비 귀환 지연
+        if (gameOverManager != null)
+        {
+            // UI를 띄우고 이미지를 넘깁니다.
+            gameOverManager.TriggerGameOverUI();
+
+            // 이미지 3장 x 3초 = 9초이므로, 10초 뒤에 로비로 텔레포트 시킵니다.
+            StartCoroutine(DelayedReturnToLobby(10f));
+        }
+        else
+        {
+            // UI가 연결 안 되어 있으면 바로 귀환합니다.
+            ReturnToLobby();
+        }
+    }
+
+    // ? [새로 추가됨] 일정 시간 대기 후 로비로 귀환하는 코루틴
+    private IEnumerator DelayedReturnToLobby(float delay)
+    {
+        yield return new WaitForSeconds(delay);
         ReturnToLobby();
+
+        // 텔레포트 완료 후 게임 오버 캔버스를 닫아줍니다.
+        if (gameOverManager != null)
+        {
+            gameOverManager.HideGameOverUIClientRpc();
+        }
     }
 
     private void ReturnToLobby()
@@ -209,7 +213,7 @@ public class GameManager : NetworkBehaviour
         CleanUpTags("Food");
         CleanUpTags("Enemy");
         CleanUpTags("Cobweb");
-        CleanUpTags("Egg"); // ? 들고 오지 못하고 던져진 필드의 알들도 다음 판을 위해 깔끔히 청소
+        CleanUpTags("Egg");
     }
 
     private void CleanUpTags(string tagName)
@@ -234,7 +238,14 @@ public class GameManager : NetworkBehaviour
         PlayerMovement[] allPlayers = FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None);
         foreach (PlayerMovement player in allPlayers)
         {
-            player.TeleportClientRpc(targetPosition);
+            if (player.isDead.Value)
+            {
+                player.ReviveServerRpc(targetPosition);
+            }
+            else
+            {
+                player.TeleportClientRpc(targetPosition);
+            }
         }
     }
 }

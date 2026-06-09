@@ -207,19 +207,27 @@ public class PlayerSkill : NetworkBehaviour
     /// [Outline 벽 투시 조건]
     /// Outline 컴포넌트(QuickOutline 등)의 머티리얼이
     /// ZTest Always로 설정되어 있어야 벽을 뚫고 보임.
-    
+
     private void ActivateSearchSkill()
     {
         // 기존 탐색 결과 초기화
         ClearSearchOutlines();
         if (searchCoroutine != null) StopCoroutine(searchCoroutine);
 
-        // 반경 내 음식 탐색
-        Collider[] hits = Physics.OverlapSphere(transform.position, EffectiveSearchRadius, foodLayer);
+        Collider[] hits = Physics.OverlapSphere(transform.position, EffectiveSearchRadius);
+
         foreach (Collider hit in hits)
         {
+            if (!hit.CompareTag("Food")) continue;
+
             Outline outline = hit.GetComponent<Outline>();
-            if (outline == null) continue;
+
+            // 만약 음식에 Outline 컴포넌트가 없다면 무시합니다.
+            if (outline == null)
+            {
+                Debug.LogWarning($"[탐색 스킬] {hit.name}에 Outline 컴포넌트가 없습니다!");
+                continue;
+            }
 
             outline.enabled = true;
             activeSearchOutlines.Add(outline);

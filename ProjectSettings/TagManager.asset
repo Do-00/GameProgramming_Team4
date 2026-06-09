@@ -9,6 +9,7 @@ TagManager:
   - Enemy
   - Cobweb
   - Egg
+  - ReviveButton
   layers:
   - Default
   - TransparentFX

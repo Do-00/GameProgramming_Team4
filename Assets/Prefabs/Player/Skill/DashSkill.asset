@@ -17,4 +17,19 @@ MonoBehaviour:
   description: "\uC774\uC18D \uC99D\uAC00"
   icon: {fileID: 0}
   unlockCost: 1
-  upgrades: []
+  upgrades:
+  - upgradeName: "1\uCC28 \uAC15\uD654"
+    upgradeDescription: 
+    cost: 1
+    bonusDuration: 1
+    bonusRadius: 0
+  - upgradeName: "2\uCC28 \uAC15\uD654"
+    upgradeDescription: 
+    cost: 2
+    bonusDuration: 1
+    bonusRadius: 0
+  - upgradeName: "3\uCC28 \uAC15\uD654"
+    upgradeDescription: 
+    cost: 2
+    bonusDuration: 1
+    bonusRadius: 0

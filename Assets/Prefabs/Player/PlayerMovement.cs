@@ -6,44 +6,50 @@ using UnityEngine.UI;
 public class PlayerMovement : NetworkBehaviour
 {
     [Header("이동 설정")]
-    [SerializeField] private float walkSpeed = 10f;      // 걷는 속도
-    [SerializeField] private float sprintSpeed = 15f;     // 달리는 속도
-    [SerializeField] private float flySpeed = 20f;       // 날 때의 대쉬 속도
-    [SerializeField] private float flyStrafeSpeed = 12f; // 날 때의 측면 이동 속도
+    [SerializeField] private float walkSpeed = 10f;
+    [SerializeField] private float sprintSpeed = 15f;
+    [SerializeField] private float flySpeed = 20f;
+    [SerializeField] private float flyStrafeSpeed = 12f;
 
     [Header("점프 & 대쉬 설정")]
-    [SerializeField] private float jumpForce = 15f;     // 점프 거리
-    [SerializeField] private float fallMultiplier = 4f; // 낙하 가속도
-    [SerializeField] private float upwardMultiplier = 2.5f;  // 상승 가속도
-    [SerializeField] private float dashSpeed = 40f;    // 대쉬 속도
-    [SerializeField] private float groundDashDuration = 0.2f; // 지상 대쉬 지속 시간
-    [SerializeField] private float flyDashDuration = 0.15f;  // 비행 대쉬 지속 시간
-    [SerializeField] private float dashCooldown = 1.5f;  // 대쉬 쿨타임
-    [SerializeField] private float dashFriction = 5f;  // 대쉬 감속 속도
-    [SerializeField] private float groundCheckDistance = 1.1f; // 지면 체크 거리
+    [SerializeField] private float jumpForce = 15f;
+    [SerializeField] private float fallMultiplier = 4f;
+    [SerializeField] private float upwardMultiplier = 2.5f;
+    [SerializeField] private float dashSpeed = 40f;
+    [SerializeField] private float groundDashDuration = 0.2f;
+    [SerializeField] private float flyDashDuration = 0.15f;
+    [SerializeField] private float dashCooldown = 1.5f;
+    [SerializeField] private float dashFriction = 5f;
+    [SerializeField] private float groundCheckDistance = 1.1f;
 
     [Header("비행 스태미너 설정")]
-    [SerializeField] private float maxFlightStamina = 20f;       // 최대 비행 시간
-    [SerializeField] private float staminaDrainRate = 1f;        // 초당 소모량
-    [SerializeField] private float staminaRegenRate = 1.5f;      // 지상 대기 중 초당 회복량
+    [SerializeField] private float maxFlightStamina = 20f;
+    [SerializeField] private float staminaDrainRate = 1f;
+    [SerializeField] private float staminaRegenRate = 1.5f;
 
     [Header("사망 및 관전 설정")]
     public NetworkVariable<bool> isDead = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public NetworkVariable<int> deathCount = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    private int currentSpectateIndex = 0; // 현재 관전 중인 팀원 번호
-    private Transform spectateTarget;     // 관전할 대상의 위치
+    private int currentSpectateIndex = 0;
+    private Transform spectateTarget;
+
+    [Header("부활 시스템")]
+    public NetworkVariable<float> timeOfDeath = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private Vector3 initialCameraLocalPos;
+    private Quaternion initialCameraLocalRot;
 
     [Header("체력 설정")]
-    [SerializeField] private float maxHealth = 100f; // 최대 체력
+    [SerializeField] private float maxHealth = 100f;
 
     [Header("UI 설정")]
-    [SerializeField] private GameObject playerUICanvas; // 내 화면에서만 켤 캔버스
-    [SerializeField] private Slider staminaSlider;      // 스태미너 바 슬라이더
-    [SerializeField] private Slider healthSlider;       // 체력 바 슬라이더
-    [SerializeField] private Slider satietySlider;      // 포만감 바 슬라이더
+    [SerializeField] private GameObject playerUICanvas;
+    [SerializeField] private GameObject GameScreenView;
+    [SerializeField] private GameObject QuotaText;
+    [SerializeField] private Slider staminaSlider;
+    [SerializeField] private Slider healthSlider;
+    [SerializeField] private Slider satietySlider;
 
-    // 서버가 엄격하게 관리하고 클라이언트들에게 실시간 복제할 네트워크 변수들
     public NetworkVariable<float> currentStamina = new NetworkVariable<float>(20f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public NetworkVariable<bool> isFlightBlocked = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public NetworkVariable<float> currentHealth = new NetworkVariable<float>(100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -57,31 +63,31 @@ public class PlayerMovement : NetworkBehaviour
 
     [Header("에너지 & 상호작용 설정")]
     public NetworkVariable<int> currentEnergy = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    [SerializeField] private int maxEnergy = 100; // 최대 포만감(에너지) 제한치
+    [SerializeField] private int maxEnergy = 100;
     [SerializeField] private GameObject eggPrefab;
-    [SerializeField] private float interactDistance = 4f; // 음식 섭취 최대 사거리
-    [SerializeField] private float eatDuration = 3f; // 섭취에 걸리는 시간
-    private Outline currentlyHighlightedFood; // 현재 하이라이트 중인 음식
-    private float eatTimer = 0f;                     // 현재 얼마나 먹었는지 측정
-    private bool isEating = false;                   // 현재 먹고 있는 중인지
+    [SerializeField] private float interactDistance = 4f;
+    [SerializeField] private float eatDuration = 3f;
+    private Outline currentlyHighlightedFood; 
+    private float eatTimer = 0f;                     
+    private bool isEating = false;                   
 
     [Header("알 운반 설정")]
-    [SerializeField] private Transform holdPoint; // 카메라의 자식으로 둔 빈 오브젝트 (알을 들 위치)
-    private NetworkObject carriedEgg = null;      // 현재 들고 있는 알
+    [SerializeField] private Transform holdPoint; 
+    private NetworkObject carriedEgg = null;      
 
-    private bool isFlying = false;  // 날고 있는지 여부 (서버가 관리)
-    private float xRotation = 0f;  // 카메라의 수직 회전값 (서버가 관리)
+    private bool isFlying = false;  
+    private float xRotation = 0f;  
 
     private Rigidbody rb;
     private Vector3 inputVelocity = Vector3.zero;
-    private Animator animator; //애니메이션 
-    private PlayerSkill playerSkill; // 플레이어 스킬
+    private Animator animator; 
+    private PlayerSkill playerSkill; 
 
-    private bool isDashing = false;   // 대쉬 중인지 여부 (서버가 관리)
-    private float dashTimer = 0f;     // 대쉬 지속 시간 타이머
-    private float nextDashTime = 0f;  // 다음 대쉬 가능 시간
-    private Vector3 dashDirection;    // 대쉬 방향 (서버가 관리)
-    private float currentDashSpeed = 0f;  // 현재 대쉬 속도 (서버가 관리)
+    private bool isDashing = false;   
+    private float dashTimer = 0f;     
+    private float nextDashTime = 0f;  
+    private Vector3 dashDirection;    
+    private float currentDashSpeed = 0f;  
 
     [Header("사운드")]
     private AudioSource audioSource;
@@ -91,9 +97,9 @@ public class PlayerMovement : NetworkBehaviour
     public AudioClip eat_s;
     public AudioClip walk_s;
     public AudioClip plop_s;
-    public AudioClip land_s;              // 착지 사운드
-    private float walkSoundTimer = 0.5f;    // 발소리 간격 타이머
-    private bool wasGrounded = true;      // 착지 감지용: 이전 프레임 지면 여부
+    public AudioClip land_s;              
+    private float walkSoundTimer = 0.5f;    
+    private bool wasGrounded = true;      
 
     private void Awake()
     {
@@ -101,6 +107,12 @@ public class PlayerMovement : NetworkBehaviour
         animator = GetComponent<Animator>();
         playerSkill = GetComponent<PlayerSkill>();
         audioSource = GetComponent<AudioSource>();
+
+        if (playerCamera != null)
+        {
+            initialCameraLocalPos = playerCamera.transform.localPosition;
+            initialCameraLocalRot = playerCamera.transform.localRotation;
+        }
     }
 
     public override void OnNetworkSpawn()
@@ -126,7 +138,16 @@ public class PlayerMovement : NetworkBehaviour
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
             }
 
-            if (playerUICanvas != null) playerUICanvas.SetActive(true);
+            if (playerUICanvas != null) 
+            {
+                playerUICanvas.SetActive(true);
+                // 혹시 꺼져있을 자식 UI들도 초기화 시 켜줍니다.
+                foreach (Transform child in playerUICanvas.transform)
+                {
+                    child.gameObject.SetActive(true);
+                }
+            }
+
             if (staminaSlider != null)
             {
                 staminaSlider.maxValue = maxFlightStamina;
@@ -149,6 +170,7 @@ public class PlayerMovement : NetworkBehaviour
             if (playerCamera.GetComponent<AudioListener>() != null)
                 playerCamera.GetComponent<AudioListener>().enabled = false;
 
+            // 남의 화면 UI 캔버스는 통째로 꺼두는 것이 맞습니다.
             if (playerUICanvas != null) playerUICanvas.SetActive(false);
         }
     }
@@ -202,6 +224,12 @@ public class PlayerMovement : NetworkBehaviour
                         GameManager.Instance.TargetButtonInteractedServerRpc();
                         return;
                     }
+                    else if (hit.collider.CompareTag("ReviveButton"))
+                    {
+                        ResurrectionShrine shrine = FindFirstObjectByType<ResurrectionShrine>();
+                        if (shrine != null) shrine.InteractReviveButtonServerRpc();
+                        return;
+                    }
                     else if (hit.collider.CompareTag("Egg"))
                     {
                         NetworkObject eggNetObj = hit.collider.GetComponent<NetworkObject>();
@@ -250,6 +278,7 @@ public class PlayerMovement : NetworkBehaviour
     void FixedUpdate()
     {
         if (!IsOwner) return;
+        if (!IsSpawned) return;
         if (isDead.Value) return;
 
         SubmitMovementServerRpc(inputVelocity, isFlying);
@@ -279,10 +308,31 @@ public class PlayerMovement : NetworkBehaviour
 
         isDead.Value = true;
         deathCount.Value += 1;
-        PlaySoundClientRpc("die");
+        timeOfDeath.Value = Time.time; 
 
+        PlaySoundClientRpc("die");
         SetDeathStateClientRpc(true);
         Debug.Log($"[{gameObject.name}] 파리 사망! 누적 데스: {deathCount.Value}");
+
+        CheckTeamWipe();
+    }
+
+    private void CheckTeamWipe()
+    {
+        if (!IsServer) return;
+
+        PlayerMovement[] allPlayers = FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None);
+        foreach (PlayerMovement p in allPlayers)
+        {
+            if (!p.isDead.Value) return;
+        }
+
+        Debug.Log("[시스템] 모든 파리가 사망했습니다. 강제 게임 오버를 진행합니다.");
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.TriggerGameOver();
+        }
     }
 
     [ClientRpc]
@@ -299,14 +349,76 @@ public class PlayerMovement : NetworkBehaviour
 
         if (IsOwner)
         {
-            if (playerUICanvas != null) playerUICanvas.SetActive(!deathState);
+            if (playerUICanvas != null)
+            {
+                if (deathState)
+                {
+                    foreach (Transform child in playerUICanvas.transform)
+                    {
+                        child.gameObject.SetActive(false);
+                    }
+                    // 2. 관전 중 유지할 UI만 다시 활성화
+                    if (GameScreenView != null) GameScreenView.SetActive(true);
+                    if (QuotaText != null) QuotaText.SetActive(true);
+                }
+                else
+                {
+                    foreach (Transform child in playerUICanvas.transform)
+                    {
+                        child.gameObject.SetActive(true);
+                    }
+                }
+            }
 
             if (deathState)
             {
-                spectateTarget = this.transform;
-                Debug.Log("[시스템] 사망. 마우스 좌클릭으로 살아있는 팀원을 관전.");
+                spectateTarget = null;
+                Debug.Log("[시스템] 사망. 마우스 클릭으로 살아있는 팀원을 관전.");
             }
         }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ReviveServerRpc(Vector3 revivePos)
+    {
+        isDead.Value = false;
+        currentHealth.Value = maxHealth;
+        ReviveClientRpc(revivePos);
+    }
+
+    [ClientRpc]
+    private void ReviveClientRpc(Vector3 revivePos)
+    {
+        if (IsOwner && playerCamera != null)
+        {
+            playerCamera.transform.localPosition = initialCameraLocalPos;
+            playerCamera.transform.localRotation = initialCameraLocalRot;
+        }
+
+        Renderer[] renderers = GetComponentsInChildren<Renderer>();
+        foreach (Renderer r in renderers) r.enabled = true;
+
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = true;
+
+        rb.isKinematic = true;
+        transform.position = revivePos;
+        rb.isKinematic = false;
+
+        if (IsOwner)
+        {
+            // ✨ [수정됨] 부활 시 캔버스 안의 자식(UI 요소들)을 다시 켜줍니다.
+            if (playerUICanvas != null)
+            {
+                foreach (Transform child in playerUICanvas.transform)
+                {
+                    child.gameObject.SetActive(true);
+                }
+            }
+            spectateTarget = null;
+        }
+
+        Debug.Log($"[{gameObject.name}] 부활 완료!");
     }
 
     private void HandleLook()
@@ -438,15 +550,12 @@ public class PlayerMovement : NetworkBehaviour
             else rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         }
 
-        // ✨ [다시 추가된 중력 가속도 보정 로직]
         if (!flyingState)
         {
-            // 떨어질 때 더 빨리 떨어지도록 (fallMultiplier 적용)
             if (rb.linearVelocity.y < 0)
             {
                 rb.linearVelocity += Vector3.up * Physics.gravity.y * (fallMultiplier - 1f) * Time.fixedDeltaTime;
             }
-            // 상승 중일 때도 묵직함을 주기 위해 가속도 보정 (upwardMultiplier 적용)
             else if (rb.linearVelocity.y > 0)
             {
                 rb.linearVelocity += Vector3.up * Physics.gravity.y * (upwardMultiplier - 1f) * Time.fixedDeltaTime;
@@ -579,12 +688,16 @@ public class PlayerMovement : NetworkBehaviour
 
     private void HandleSpectatorInput()
     {
-        if (Input.GetMouseButtonDown(0)) SwitchSpectateTarget();
+        if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)) SwitchSpectateTarget();
 
         if (spectateTarget != null)
         {
-            playerCamera.transform.position = spectateTarget.position;
-            playerCamera.transform.rotation = spectateTarget.rotation;
+            Vector3 targetPos = spectateTarget.position - spectateTarget.forward * 2.5f + Vector3.up * 1.5f;
+            
+            playerCamera.transform.position = Vector3.Lerp(playerCamera.transform.position, targetPos, Time.deltaTime * 10f);
+            
+            Quaternion targetRot = Quaternion.LookRotation((spectateTarget.position + Vector3.up * 1f) - playerCamera.transform.position);
+            playerCamera.transform.rotation = Quaternion.Slerp(playerCamera.transform.rotation, targetRot, Time.deltaTime * 10f);
         }
     }
 
@@ -601,11 +714,13 @@ public class PlayerMovement : NetworkBehaviour
         if (aliveTeammates.Count > 0)
         {
             currentSpectateIndex = (currentSpectateIndex + 1) % aliveTeammates.Count;
-            spectateTarget = aliveTeammates[currentSpectateIndex].playerCamera.transform;
+            spectateTarget = aliveTeammates[currentSpectateIndex].transform;
         }
         else
         {
-            spectateTarget = this.transform;
+            spectateTarget = null;
+            playerCamera.transform.localPosition = initialCameraLocalPos;
+            playerCamera.transform.localRotation = initialCameraLocalRot;
             Debug.Log("살아있는 팀원이 없음... 게임 오버 대기 중.");
         }
     }

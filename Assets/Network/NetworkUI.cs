@@ -14,90 +14,115 @@ using TMPro;
 public class NetworkUI : MonoBehaviour
 {
     [Header("메인 메뉴 버튼")]
-    [SerializeField] private Button hostBtn;  // 방장 버튼
-    [SerializeField] private Button clientBtn; // 참가자 버튼
-    [SerializeField] private Button quitBtn;  // 종료 버튼
-    [SerializeField] private Button mainMenuSettingBtn; // 메인 메뉴 설정
+    [SerializeField] private Button hostBtn;
+    [SerializeField] private Button clientBtn;
+    [SerializeField] private Button quitBtn;
+    [SerializeField] private Button mainMenuSettingBtn;
 
     [Header("클라이언트 접속 전용 UI")]
-    [SerializeField] private TMP_InputField codeInputField; // 방 코드 입력 필드
-    [SerializeField] private Button joinConfirmBtn;    // 방 코드로 참가 버튼
-    [SerializeField] private Button backBtn;             // 뒤로 가기 버튼
+    [SerializeField] private TMP_InputField codeInputField;
+    [SerializeField] private Button joinConfirmBtn;
+    [SerializeField] private Button backBtn;
 
     [Header("방장 전용 UI")]
-    [SerializeField] private TextMeshProUGUI codeText;   // 방 코드 표시 텍스트
+    [SerializeField] private TextMeshProUGUI codeText;
 
     [Header("인게임 일시정지 UI")]
-    [SerializeField] private GameObject pausePanel;   // 일시정지 패널
-    [SerializeField] private Button resumeBtn;       // 일시정지 해제 버튼
-    [SerializeField] private Button disconnectBtn;   // 서버 연결 끊고 메인 메뉴로 돌아가기 버튼
-    [SerializeField] private Button inGameQuitBtn;    // 게임 종료 버튼
-    [SerializeField] private Button inGameSettingBtn; // 인게임 설정
+    [SerializeField] private GameObject pausePanel;
+    [SerializeField] private Button resumeBtn;
+    [SerializeField] private Button disconnectBtn;
+    [SerializeField] private Button inGameQuitBtn;
+    [SerializeField] private Button inGameSettingBtn;
 
     [Header("설정 UI")]
-    [SerializeField] private GameObject settingPanel; // 설정 창 UI
-    [SerializeField] private Button closeSettingBtn;  // 설정 창 안의 닫기 버튼
-    [SerializeField] private Toggle windowModeToggle; // 창모드 토글
+    [SerializeField] private GameObject settingPanel;
+    [SerializeField] private Button closeSettingBtn;
+    [SerializeField] private Toggle windowModeToggle;
+    [SerializeField] private Slider masterVolumeSlider;
+    [SerializeField] private Toggle micToggle; // ✨ 마이크 On/Off 토글 추가
 
-    private async void Start()  // 게임 시작 시 초기화 및 UI 설정
+    private async void Start()
     {
         ShowMainMenu();
-        codeText.gameObject.SetActive(false);  // 방 코드 텍스트는 처음에 숨김
-        pausePanel.SetActive(false);         // 일시정지 패널도 처음에는 숨김
-        settingPanel.SetActive(false);      // 게임 시작 시 설정창 숨기기
+        codeText.gameObject.SetActive(false);
+        pausePanel.SetActive(false);
+        settingPanel.SetActive(false);
 
-        if (UnityServices.State != ServicesInitializationState.Initialized)  // 유니티 서비스가 초기화되지 않았다면 초기화 진행
+        if (UnityServices.State != ServicesInitializationState.Initialized)
         {
-            await UnityServices.InitializeAsync();                          // 유니티 서비스 초기화
+            await UnityServices.InitializeAsync();
         }
 
-        if (!AuthenticationService.Instance.IsSignedIn)                  // 유니티 클라우드에 익명으로 로그인되어 있지 않다면 로그인 시도
+        if (!AuthenticationService.Instance.IsSignedIn)
         {
             await AuthenticationService.Instance.SignInAnonymouslyAsync();
             Debug.Log("유니티 클라우드 익명 로그인 완료!");
         }
 
-        // 게임 시작 시 현재 화면 상태를 체크해서 토글에 반영 (전체화면이 아니면 창모드 켜짐)
+        // 창모드 토글 초기화
         if (windowModeToggle != null)
         {
             windowModeToggle.isOn = !Screen.fullScreen;
             windowModeToggle.onValueChanged.AddListener(SetWindowMode);
         }
 
-        // 함수 연결
+        // 볼륨 슬라이더 초기화
+        if (masterVolumeSlider != null)
+        {
+            float savedVolume = PlayerPrefs.GetFloat("MasterVolume", 1f);
+            masterVolumeSlider.minValue = 0f;
+            masterVolumeSlider.maxValue = 1f;
+            masterVolumeSlider.value = savedVolume;
+            AudioListener.volume = savedVolume;
+            masterVolumeSlider.onValueChanged.AddListener(SetMasterVolume);
+        }
+
+        // ✨ 마이크 토글 초기화
+        if (micToggle != null)
+        {
+            micToggle.onValueChanged.AddListener(OnMicToggleChanged);
+        }
+
+        // 버튼 함수 연결
         hostBtn.onClick.AddListener(StartRelayHost);
         clientBtn.onClick.AddListener(ShowInputUI);
         joinConfirmBtn.onClick.AddListener(StartRelayClient);
         backBtn.onClick.AddListener(ShowMainMenu);
         quitBtn.onClick.AddListener(QuitGame);
-        mainMenuSettingBtn.onClick.AddListener(OpenSettings); //메인 설정
+        mainMenuSettingBtn.onClick.AddListener(OpenSettings);
 
         resumeBtn.onClick.AddListener(TogglePauseMenu);
         disconnectBtn.onClick.AddListener(DisconnectAndReturnToMenu);
         inGameQuitBtn.onClick.AddListener(QuitGame);
-        inGameSettingBtn.onClick.AddListener(OpenSettings); //인게임 설정
-        closeSettingBtn.onClick.AddListener(CloseSettings); // 설정창 닫기 버튼
+        inGameSettingBtn.onClick.AddListener(OpenSettings);
+        closeSettingBtn.onClick.AddListener(CloseSettings);
     }
 
-    private void Update()  // 매 프레임마다 일시정지 메뉴 토글을 위한 입력 감지
+    private void Update()
     {
-        if (NetworkManager.Singleton == null) return;  // 네트워크 매니저가 존재하지 않으면 입력 감지 안 함
+        if (NetworkManager.Singleton == null) return;
 
-        if (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer)  // 게임이 진행 중일 때만 일시정지 메뉴 토글 입력 감지
+        if (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer)
         {
-            if (Input.GetKeyDown(KeyCode.Escape))  // Escape 키를 눌렀을 때 일시정지 메뉴 토글
+            if (Input.GetKeyDown(KeyCode.Escape))
             {
+                // 설정창이 열려있으면 설정창만 닫기
+                if (settingPanel.activeSelf)
+                {
+                    CloseSettings();
+                    return;
+                }
                 TogglePauseMenu();
             }
         }
     }
 
-    private void TogglePauseMenu()  // 일시정지 메뉴 활성화/비활성화 및 커서 상태 조절
+    private void TogglePauseMenu()
     {
-        bool isActive = !pausePanel.activeSelf;  // 현재 일시정지 패널의 활성화 상태를 반전시킴
-        pausePanel.SetActive(isActive);          // 일시정지 패널의 활성화 상태를 설정
+        bool isActive = !pausePanel.activeSelf;
+        pausePanel.SetActive(isActive);
 
-        if (isActive) // 일시정지 메뉴가 활성화되면 커서를 보이게 하고 잠금 해제, 그렇지 않으면 커서를 숨기고 잠금
+        if (isActive)
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -109,33 +134,34 @@ public class NetworkUI : MonoBehaviour
         }
     }
 
-    private void DisconnectAndReturnToMenu()  // 서버와의 연결을 끊고 메인 메뉴로 돌아가는 기능
+    private void DisconnectAndReturnToMenu()
     {
         Debug.Log("서버와의 연결을 끊습니다.");
         NetworkManager.Singleton.Shutdown();
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
-    private void ShowMainMenu()  // 메인 메뉴 UI 활성화 및 커서 상태 조절
+    private void ShowMainMenu()
     {
-        Cursor.lockState = CursorLockMode.None;  // 메인 메뉴에서는 커서를 보이게 하고 잠금 해제
+        Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
         hostBtn.gameObject.SetActive(true);
         clientBtn.gameObject.SetActive(true);
         quitBtn.gameObject.SetActive(true);
-        mainMenuSettingBtn.gameObject.SetActive(true); // 추가
+        mainMenuSettingBtn.gameObject.SetActive(true);
 
         codeInputField.gameObject.SetActive(false);
         joinConfirmBtn.gameObject.SetActive(false);
         backBtn.gameObject.SetActive(false);
     }
 
-    private void ShowInputUI() // 클라이언트 참가를 위한 UI 활성화 및 메인 메뉴 버튼 비활성화
+    private void ShowInputUI()
     {
         hostBtn.gameObject.SetActive(false);
         clientBtn.gameObject.SetActive(false);
         quitBtn.gameObject.SetActive(false);
+        mainMenuSettingBtn.gameObject.SetActive(false);
 
         codeInputField.gameObject.SetActive(true);
         joinConfirmBtn.gameObject.SetActive(true);
@@ -187,49 +213,69 @@ public class NetworkUI : MonoBehaviour
         }
     }
 
-    private void QuitGame()  // 게임 종료 기능, 에디터에서는 플레이 모드를 종료하고, 빌드된 게임에서는 애플리케이션을 종료
+    private void QuitGame()
     {
         Debug.Log("게임을 종료합니다.");
 #if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;  // 에디터에서는 플레이 모드를 종료
+        UnityEditor.EditorApplication.isPlaying = false;
 #else
-        Application.Quit();  // 빌드된 게임에서는 애플리케이션을 종료
+        Application.Quit();
 #endif
     }
 
-    // 설정창 열기
     private void OpenSettings()
     {
-        Debug.Log("설정창 열기 버튼 눌림!");
+        Debug.Log("설정창 열기!");
         settingPanel.SetActive(true);
     }
 
-    // 설정창 닫기
     private void CloseSettings()
     {
         Debug.Log("설정창 닫힘!");
         settingPanel.SetActive(false);
     }
 
-    // 창모드
     private void SetWindowMode(bool isWindowed)
     {
         if (isWindowed)
         {
-            // 체크박스가 켜지면 창모드로 변경
             Screen.fullScreenMode = FullScreenMode.Windowed;
-            Screen.SetResolution(1280, 720, false); //화면 크기 지정
+            Screen.SetResolution(1280, 720, false);
             Debug.Log("창모드로 전환됨");
         }
         else
         {
-            // 체크박스가 꺼지면 전체화면(테두리 없는 전체화면)으로 변경
             Screen.fullScreenMode = FullScreenMode.FullScreenWindow;
             Debug.Log("전체화면으로 전환됨");
         }
     }
 
-    private void HideAllUI()  // 모든 UI 요소를 비활성화하여 게임 화면만 보이도록 설정
+    private void SetMasterVolume(float value)
+    {
+        AudioListener.volume = value;
+        PlayerPrefs.SetFloat("MasterVolume", value);
+        Debug.Log($"마스터 볼륨: {value}");
+    }
+
+    // ✨ 마이크 토글 조절 함수 추가
+    private void OnMicToggleChanged(bool isOn)
+    {
+        VivoxManager vivoxManager = FindFirstObjectByType<VivoxManager>();
+
+        if (vivoxManager != null)
+        {
+            // isOn이 true면 마이크 켜짐 (isMuted = false)
+            // isOn이 false면 마이크 꺼짐 (isMuted = true)
+            vivoxManager.SetMicrophoneMute(!isOn);
+            Debug.Log($"마이크 켜짐 상태: {isOn}");
+        }
+        else
+        {
+            Debug.LogWarning("VivoxManager를 찾을 수 없어 마이크 상태를 변경할 수 없습니다.");
+        }
+    }
+
+    private void HideAllUI()
     {
         hostBtn.gameObject.SetActive(false);
         clientBtn.gameObject.SetActive(false);
@@ -237,8 +283,8 @@ public class NetworkUI : MonoBehaviour
         codeInputField.gameObject.SetActive(false);
         joinConfirmBtn.gameObject.SetActive(false);
         backBtn.gameObject.SetActive(false);
-        mainMenuSettingBtn.gameObject.SetActive(false); //추가
+        mainMenuSettingBtn.gameObject.SetActive(false);
 
-        settingPanel.SetActive(false); // 추가
+        settingPanel.SetActive(false);
     }
 }

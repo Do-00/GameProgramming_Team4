@@ -6,10 +6,11 @@ using UnityEngine;
 public class MonsterCatAI : NetworkBehaviour
 {
     private AudioSource audioSource;
- 
+
     public AudioClip attackSound;
     public AudioClip jumpSound;
     public AudioClip stunSound;
+
     public enum CatState
     {
         Idle,
@@ -39,7 +40,6 @@ public class MonsterCatAI : NetworkBehaviour
     [SerializeField] private float jumpGravityMultiplier = 3f;
     [SerializeField] private float jumpOvershootRatio = 0.2f;
 
-    // ✨ [새로 추가됨] 공격 데미지 설정
     [Header("공격 데미지 설정")]
     [SerializeField] private float dashDamage = 80f;     // 지상 관통 돌진 시 큰 데미지
     [SerializeField] private float airJumpDamage = 40f;  // 공중 점프 관통 시 약한 데미지
@@ -52,6 +52,12 @@ public class MonsterCatAI : NetworkBehaviour
     [SerializeField] private Animator catAnimator;
     [SerializeField] private Transform catModel;
 
+    // ✨ [추가된 조명 설정]
+    [Header("조명 및 안광 설정")]
+    [SerializeField] private Light catEyeLight;       // 주변을 붉게 밝힐 Point Light
+    [SerializeField] private GameObject glowEffect;   // 안개를 뚫고 보일 가짜 붉은 눈 (Quad)
+    [SerializeField] private Color chargeLightColor = Color.red;
+
     private NetworkVariable<CatState> currentState = new NetworkVariable<CatState>(CatState.Idle);
 
     private Rigidbody rb;
@@ -61,16 +67,18 @@ public class MonsterCatAI : NetworkBehaviour
     private bool isJumpingAttack = false;
     private bool canStunFromCollision = false;
 
-    private void Awake() { rb = GetComponent<Rigidbody>(); audioSource = GetComponent<AudioSource>(); }
+    private void Awake()
+    {
+        rb = GetComponent<Rigidbody>();
+        audioSource = GetComponent<AudioSource>();
+    }
 
-    // null 안전 사운드 재생 헬퍼
     private void PlaySound(AudioClip clip)
     {
         if (audioSource != null && clip != null)
             audioSource.PlayOneShot(clip);
     }
 
-    // 서버에서 호출 → 모든 클라이언트에서 사운드 재생 (0=attack, 1=jump, 2=stun)
     [ClientRpc]
     private void PlaySoundClientRpc(int soundIndex)
     {
@@ -86,14 +94,19 @@ public class MonsterCatAI : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        if (!IsServer) return;
+        // ✨ 클라이언트도 상태 변화를 감지하여 조명과 애니메이션을 처리하도록 수정
         currentState.OnValueChanged += OnCatStateChanged;
+
+        // ✨ 초기 스폰 시 조명 끄기
+        UpdateCatLight(false);
+
+        if (!IsServer) return;
         StartCoroutine(AILoop());
     }
 
     public override void OnNetworkDespawn()
     {
-        if (IsServer) currentState.OnValueChanged -= OnCatStateChanged;
+        currentState.OnValueChanged -= OnCatStateChanged;
     }
 
     private IEnumerator AILoop()
@@ -226,16 +239,17 @@ public class MonsterCatAI : NetworkBehaviour
             canStunFromCollision = true;
 
             float timer = totalAirTime;
+
+            // ✨ [수정됨] 프레임 환경에 영향받지 않도록 물리 프레임(FixedUpdate) 기준으로 대기합니다.
             while (timer > 0 && currentState.Value == CatState.Charging)
             {
                 rb.AddForce(Vector3.down * baseGravity * (jumpGravityMultiplier - 1f), ForceMode.Acceleration);
-                timer -= Time.deltaTime;
-                yield return null;
+                timer -= Time.fixedDeltaTime;
+                yield return new WaitForFixedUpdate();
             }
         }
         else
         {
-
             Vector3 groundDir = new Vector3(lockedTargetPos.x - transform.position.x, 0, lockedTargetPos.z - transform.position.z).normalized;
             rb.linearVelocity = groundDir * pounceInitialSpeed;
 
@@ -243,11 +257,13 @@ public class MonsterCatAI : NetworkBehaviour
             canStunFromCollision = true;
 
             float currentSpeed = pounceInitialSpeed;
+
+            // ✨ [추가 안전장치] 지상 돌진 시에도 물리 연산 꼬임 방지를 위해 FixedUpdate로 통일했습니다.
             while (currentSpeed > 0.1f && currentState.Value == CatState.Charging)
             {
-                currentSpeed = Mathf.Lerp(currentSpeed, 0f, Time.deltaTime * pounceFriction);
+                currentSpeed = Mathf.Lerp(currentSpeed, 0f, Time.fixedDeltaTime * pounceFriction);
                 rb.linearVelocity = new Vector3(groundDir.x * currentSpeed, rb.linearVelocity.y, groundDir.z * currentSpeed);
-                yield return null;
+                yield return new WaitForFixedUpdate();
             }
         }
 
@@ -273,23 +289,17 @@ public class MonsterCatAI : NetworkBehaviour
         }
     }
 
-    // ✨ [새로 추가됨] 플레이어 관통 시 데미지를 주는 트리거 이벤트
     private void OnTriggerEnter(Collider other)
     {
-        // 💥 데미지 판정은 서버에서만 처리합니다.
         if (!IsServer) return;
 
-        // 고양이가 돌진(Charging) 상태일 때만 데미지가 들어갑니다.
         if (currentState.Value == CatState.Charging && other.CompareTag("Player"))
         {
             PlayerMovement player = other.GetComponent<PlayerMovement>();
 
-            // 플레이어가 살아있을 때만 타격
             if (player != null && player.currentHealth.Value > 0)
             {
-                // 점프 중인지 지상인지 확인하여 데미지 결정
                 float currentDamage = isJumpingAttack ? airJumpDamage : dashDamage;
-
                 player.TakeDamage(currentDamage);
                 PlaySoundClientRpc(0); // attackSound
                 Debug.Log($"[서버 고양이] 관통 공격 성공! 데미지: {currentDamage} (점프 공격: {isJumpingAttack})");
@@ -306,8 +316,26 @@ public class MonsterCatAI : NetworkBehaviour
         currentState.Value = CatState.Idle;
     }
 
+    // ✨ [추가됨] 조명 ON/OFF를 제어하는 함수
+    private void UpdateCatLight(bool turnOn)
+    {
+        if (catEyeLight != null)
+        {
+            catEyeLight.enabled = turnOn;
+            if (turnOn) catEyeLight.color = chargeLightColor;
+        }
+
+        if (glowEffect != null)
+        {
+            glowEffect.SetActive(turnOn);
+        }
+    }
+
     private void OnCatStateChanged(CatState oldState, CatState newState)
     {
+        bool shouldLightBeOn = (newState == CatState.Staring || newState == CatState.Preparing || newState == CatState.Charging);
+        UpdateCatLight(shouldLightBeOn);
+
         if (catAnimator == null) return;
 
         if (catModel != null)
@@ -317,25 +345,11 @@ public class MonsterCatAI : NetworkBehaviour
 
         switch (newState)
         {
-            case CatState.Idle:
-                catAnimator.SetInteger("State", 0); // 대기
-                break;
-
-            case CatState.Staring:
-                catAnimator.SetInteger("State", 2); // 걷기
-                break;
-
-            case CatState.Preparing:
-                catAnimator.SetInteger("State", 0); // 대기 
-                break;
-
-            case CatState.Charging:
-                catAnimator.SetInteger("State", 4); // 달리기
-                break;
-
-            case CatState.Stunned:
-                catAnimator.SetInteger("State", 0); // 대기 
-                break;
+            case CatState.Idle: catAnimator.SetInteger("State", 0); break;
+            case CatState.Staring: catAnimator.SetInteger("State", 2); break;
+            case CatState.Preparing: catAnimator.SetInteger("State", 0); break;
+            case CatState.Charging: catAnimator.SetInteger("State", 4); break;
+            case CatState.Stunned: catAnimator.SetInteger("State", 0); break;
         }
     }
 
