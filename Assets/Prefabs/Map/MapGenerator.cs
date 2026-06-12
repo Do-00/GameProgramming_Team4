@@ -22,7 +22,7 @@ public class MapGenerator : NetworkBehaviour
     {
         public GameObject prefab;
         [Range(0f, 1f)] public float spawnChance;
-        public bool isUnique; // true면 방 하나에 같은 프리팹이 하나만 배치됨
+        public bool isUnique;
     }
 
     [System.Serializable]
@@ -42,7 +42,7 @@ public class MapGenerator : NetworkBehaviour
     private class RoomInstance
     {
         public GameObject roomObject;
-        public Vector2Int originGrid; // 방이 차지하는 그리드 셀 중 가장 좌하단 좌표
+        public Vector2Int originGrid;
         public RoomType roomType;
         public Vector2Int size;
         public List<FurnitureData> assignedWallPool;
@@ -93,12 +93,7 @@ public class MapGenerator : NetworkBehaviour
     [SerializeField] private Vector3 fallbackDoorRotationNS = new Vector3(0f, 90f, 0f);
     [SerializeField] private Vector3 fallbackDoorRotationEW = new Vector3(0f, 0f, 0f);
 
-    // roomGridMap: 그리드 좌표 → 해당 위치를 차지하는 방 인스턴스
-    // 2x2 방은 4개의 그리드 셀에 동일한 RoomInstance가 등록됨
     private Dictionary<Vector2Int, RoomInstance> roomGridMap = new Dictionary<Vector2Int, RoomInstance>();
-
-    // treeEdges: 스패닝 트리 방식으로 선택된 방 연결 간선 집합
-    // 이 집합에 포함된 간선만 벽을 제거하고 문을 배치
     private HashSet<string> treeEdges = new HashSet<string>();
 
     private int totalRoomCount = 0;
@@ -110,7 +105,7 @@ public class MapGenerator : NetworkBehaviour
 
     public override void OnNetworkSpawn() { }
 
-    // 서버와 클라이언트 모두 동일한 시드로 이 함수를 호출하여 맵을 동기화
+    /// <summary>시드 기반으로 새 맵을 생성 (서버 및 클라이언트 공통 호출)</summary>
     public void BuildNewMapFromSeed(int seed)
     {
         StartCoroutine(GenerateMapNextFrame(seed));
@@ -118,7 +113,6 @@ public class MapGenerator : NetworkBehaviour
 
     private IEnumerator GenerateMapNextFrame(int seed)
     {
-        // 한 프레임 대기하여 이전 프레임의 물리/렌더 처리가 끝난 후 맵을 생성
         yield return null;
         GenerateValidHouse(seed);
     }
@@ -130,8 +124,6 @@ public class MapGenerator : NetworkBehaviour
         StartCoroutine(GenerateMapNextFrame(seed));
     }
 
-    // 최대 20회 시도하여 목표 방 수를 정확히 채운 유효한 맵을 생성
-    // 재귀 트리 알고리즘 특성상 방 배치가 실패할 수 있으므로 재시도 루프 사용
     private void GenerateValidHouse(int seed)
     {
         Random.InitState(seed);
@@ -178,8 +170,6 @@ public class MapGenerator : NetworkBehaviour
         bathroomCount = 0;
     }
 
-    // 두 그리드 좌표를 방향에 무관하게 항상 동일한 키 문자열로 변환
-    // 예) (0,0)-(1,0) 과 (1,0)-(0,0) 은 같은 키를 반환
     private string GetEdgeKey(Vector2Int a, Vector2Int b)
     {
         return a.x < b.x || (a.x == b.x && a.y < b.y)
@@ -187,9 +177,6 @@ public class MapGenerator : NetworkBehaviour
             : $"{b.x},{b.y}_{a.x},{a.y}";
     }
 
-    // 거실을 원점(0,0)에 고정 배치한 뒤 3방향으로 재귀 트리를 확장
-    // 거실은 2x2 크기이므로 (0,0)~(1,1) 4칸을 모두 등록
-    // y >= 2 구역은 쉘터/로비 영역으로 예약되어 방 배치 금지
     private void BuildHouse()
     {
         maxBathrooms = Random.Range(1, 3);
@@ -211,7 +198,6 @@ public class MapGenerator : NetworkBehaviour
         roomGridMap.Add(new Vector2Int(1, 0), lrInstance);
         roomGridMap.Add(new Vector2Int(0, 1), lrInstance);
         roomGridMap.Add(new Vector2Int(1, 1), lrInstance);
-        // y=2 구역을 null로 등록하여 방 배치 시 진입을 막음
         roomGridMap.Add(new Vector2Int(0, 2), null);
         roomGridMap.Add(new Vector2Int(1, 2), null);
 
@@ -228,16 +214,12 @@ public class MapGenerator : NetworkBehaviour
         treeEdges.Add(GetEdgeKey(new Vector2Int(-1, 0), new Vector2Int(0, 0)));
     }
 
-    // 재귀적 스패닝 트리 알고리즘으로 방을 배치
-    // 현재 그리드 위치에 방을 놓고, 4방향으로 랜덤 셔플 후 재귀 호출
-    // 목표 방 수 도달, 최대 깊이 초과, 이미 점유된 그리드이면 배치 중단
     private void TrySpawnRoomTree(Vector2Int gridPos, int currentDepth)
     {
         if (totalRoomCount >= targetRoomCount) return;
         if (gridPos.y >= 2) return;
         if (currentDepth > maxDepth || roomGridMap.ContainsKey(gridPos)) return;
 
-        // 마지막 방이거나 최대 깊이에 도달했으면 화장실 배치 우선 고려
         RoomType assignedType = RoomType.NormalRoom;
         if (bathroomCount < maxBathrooms)
         {
@@ -259,7 +241,6 @@ public class MapGenerator : NetworkBehaviour
         }
         else
         {
-            // 일반 방 변형 목록을 셔플하여 랜덤 배치, 크기가 맞지 않으면 다음 변형 시도
             List<RoomPrefabData> shuffled = new List<RoomPrefabData>(normalRoomVariants);
             ShuffleList(shuffled);
 
@@ -274,7 +255,6 @@ public class MapGenerator : NetworkBehaviour
                 }
             }
 
-            // 모든 변형이 맞지 않으면 1x1 크기로 첫 번째 변형을 강제 배치
             if (selectedPrefab == null && normalRoomVariants.Count > 0)
             {
                 chosenData = normalRoomVariants[0];
@@ -302,7 +282,6 @@ public class MapGenerator : NetworkBehaviour
             assignedCenterPool = assignedType == RoomType.Bathroom ? bathroomCenterPool : chosenData.centerPool
         };
 
-        // 방이 차지하는 모든 그리드 셀에 동일한 인스턴스를 등록
         for (int x = 0; x < roomSize.x; x++)
         {
             for (int y = 0; y < roomSize.y; y++)
@@ -320,13 +299,11 @@ public class MapGenerator : NetworkBehaviour
             return;
         }
 
-        // 4방향 셔플 후 재귀 호출하여 트리를 자연스럽게 확장
         Vector2Int[] directions = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
         ShuffleArray(directions);
 
         foreach (Vector2Int dir in directions)
         {
-            // 다중 크기 방의 경우 방 끝 셀에서 다음 칸으로 확장
             Vector2Int edgeGrid = gridPos;
             if (dir == Vector2Int.up) edgeGrid += new Vector2Int(0, roomSize.y - 1);
             if (dir == Vector2Int.right) edgeGrid += new Vector2Int(roomSize.x - 1, 0);
@@ -353,8 +330,6 @@ public class MapGenerator : NetworkBehaviour
         return true;
     }
 
-    // 인접한 방 쌍을 순회하며 treeEdges에 포함된 경계에 있는 벽을 비활성화하고 문을 배치
-    // 동일한 간선을 중복 처리하지 않도록 processedEdges로 추적
     private void CarveWallsAndSpawnDoors()
     {
         HashSet<string> processedEdges = new HashSet<string>();
@@ -366,7 +341,6 @@ public class MapGenerator : NetworkBehaviour
             if (currentRoom == null) continue;
 
             Vector2Int localGrid = currentGrid - currentRoom.originGrid;
-            // 북쪽(up)과 동쪽(right)만 검사하면 모든 경계를 한 번씩만 처리 가능
             Vector2Int[] scanDirs = { Vector2Int.up, Vector2Int.right };
 
             foreach (Vector2Int dir in scanDirs)
@@ -407,7 +381,6 @@ public class MapGenerator : NetworkBehaviour
         }
     }
 
-    // 세부 이름(예: Wall_North_0_1)을 먼저 탐색하고 없으면 범용 이름(Wall_North)으로 폴백
     private void DisableWall(GameObject room, string detailedName, string fallbackName)
     {
         Transform wall = FindChildRecursive(room.transform, detailedName)
@@ -415,7 +388,6 @@ public class MapGenerator : NetworkBehaviour
         wall?.gameObject.SetActive(false);
     }
 
-    // 소켓 트랜스폼이 있으면 그 위치에, 없으면 계산된 폴백 위치에 문을 배치
     private void SpawnDoor(GameObject room, string socketDetailed, string socketFallback, Vector3 fallbackPos, Quaternion fallbackRot)
     {
         Transform socket = FindChildRecursive(room.transform, socketDetailed)
@@ -448,7 +420,6 @@ public class MapGenerator : NetworkBehaviour
 
                 if (pool == null || pool.Count == 0) continue;
 
-                // 이미 배치된 유니크 가구는 후보에서 제외
                 var available = new List<FurnitureData>();
                 foreach (var f in pool)
                 {
@@ -464,7 +435,6 @@ public class MapGenerator : NetworkBehaviour
                 {
                     if (furniture.prefab == null || Random.value > furniture.spawnChance) continue;
 
-                    // BoxCollider를 기준으로 배치 공간에 다른 가구와 겹치지 않는지 체크
                     BoxCollider boxCol = furniture.prefab.GetComponentInChildren<BoxCollider>();
                     if (boxCol != null)
                     {
@@ -506,7 +476,7 @@ public class MapGenerator : NetworkBehaviour
             float halfW = room.size.x * unitSize * 0.5f;
             float halfL = room.size.y * unitSize * 0.5f;
 
-            // 벽 근처에 아이템이 박히지 않도록 경계에서 5 유닛 안쪽으로 스폰 범위를 제한
+            // 벽 근처 스폰 방지를 위해 5 유닛 안쪽 범위로 제한
             float minX = center.x - halfW + 5f, maxX = center.x + halfW - 5f;
             float minZ = center.z - halfL + 5f, maxZ = center.z + halfL - 5f;
 
@@ -541,7 +511,6 @@ public class MapGenerator : NetworkBehaviour
 
             if (room.roomType == RoomType.LivingRoom)
             {
-                // 거실에는 항상 고양이를 배치
                 if (catPrefab != null) SpawnEnemyInRoomBounds(room, catPrefab);
             }
             else
@@ -558,7 +527,7 @@ public class MapGenerator : NetworkBehaviour
                 spawnedSpiderCount++;
         }
 
-        // 확률 때문에 거미가 한 마리도 스폰되지 않을 경우 임의의 방에 최소 1마리 보장
+        // 확률로 한 마리도 안 나왔을 경우 최소 1마리 보장
         if (spawnedSpiderCount == 0)
         {
             RoomInstance fallback = nonLivingRooms[Random.Range(0, nonLivingRooms.Count)];
@@ -572,7 +541,7 @@ public class MapGenerator : NetworkBehaviour
         float halfW = room.size.x * unitSize * 0.5f;
         float halfL = room.size.y * unitSize * 0.5f;
 
-        // 벽 근처에 적이 박히지 않도록 경계에서 6 유닛 안쪽으로 스폰 범위를 제한
+        // 벽 근처 스폰 방지를 위해 6 유닛 안쪽 범위로 제한
         float minX = center.x - halfW + 6f, maxX = center.x + halfW - 6f;
         float minZ = center.z - halfL + 6f, maxZ = center.z + halfL - 6f;
 
@@ -584,8 +553,7 @@ public class MapGenerator : NetworkBehaviour
         return true;
     }
 
-    // 레이캐스트 결과 중 가장 높은(y값이 큰) 충돌 지점을 반환
-    // 여러 표면이 겹쳐 있을 때 바닥 대신 테이블 위처럼 가장 위쪽 표면을 선택하기 위해 사용
+    // 레이캐스트로 가장 높은 표면 위치를 구함
     private bool TryGetHighestPoint(Vector3 rayOrigin, out Vector3 result)
     {
         RaycastHit[] hits = Physics.RaycastAll(rayOrigin, Vector3.down, 40f, itemSpawnRaycastMask);

@@ -4,25 +4,22 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// 플레이어 스킬 시스템
-
 public class PlayerSkill : NetworkBehaviour
 {
-
     [Header("대시 스킬 설정")]
     [SerializeField] private KeyCode dashSkillKey = KeyCode.Q;
-    [SerializeField] private float dashSpeedMultiplier = 3.5f; // 기본 이동속도의 몇 배
-    [SerializeField] private float dashSkillDuration = 1.2f; // 효과 지속 시간(초)
-    [SerializeField] private float dashSkillCooldown = 6f;   // 쿨타임(초)
+    [SerializeField] private float dashSpeedMultiplier = 3.5f;
+    [SerializeField] private float dashSkillDuration = 1.2f;
+    [SerializeField] private float dashSkillCooldown = 6f;
 
     [Header("탐색 스킬 설정")]
     [SerializeField] private KeyCode searchSkillKey = KeyCode.G;
-    [SerializeField] private float searchRadius = 25f;  // 탐색 범위(m)
-    [SerializeField] private float searchDuration = 4f;   // 윤곽선 표시 지속 시간(초)
-    [SerializeField] private float searchCooldown = 12f;  // 쿨타임(초)
-    [SerializeField] private LayerMask foodLayer;            // 음식 레이어
+    [SerializeField] private float searchRadius = 25f;
+    [SerializeField] private float searchDuration = 4f;
+    [SerializeField] private float searchCooldown = 12f;
+    [SerializeField] private LayerMask foodLayer;
 
-    [Header("SkillData 에셋 연결 (Inspector에서 드래그)")]
+    [Header("스킬 데이터 에셋")]
     [SerializeField] public SkillData dashSkillData;
     [SerializeField] public SkillData searchSkillData;
 
@@ -30,7 +27,7 @@ public class PlayerSkill : NetworkBehaviour
     [SerializeField] private Slider dashCooldownSlider;
     [SerializeField] private Slider searchCooldownSlider;
 
-    [Header("UI — 스킬 슬롯 (배경/아이콘)")]
+    [Header("UI — 스킬 슬롯")]
     [SerializeField] private Image dashSlotBg;
     [SerializeField] private GameObject dashSkillIcon;
     [SerializeField] private Image searchSlotBg;
@@ -38,19 +35,13 @@ public class PlayerSkill : NetworkBehaviour
     [SerializeField] private Sprite skillLockedSprite;
     [SerializeField] private Sprite skillUnlockedSprite;
 
-    // 네트워크 변수 (서버 → 모든 클라이언트 동기화)
-
-    /// <summary>
-    /// PlayerMovement가 읽어서 최종 이동속도에 곱하는 배율.
-    /// 평상시 1.0 / 대시 스킬 사용 중 dashSpeedMultiplier
-    /// </summary>
+    // PlayerMovement의 SubmitMovementServerRpc에서 읽어 최종 이동속도에 곱함
+    // 평상시 1.0 / 대시 스킬 발동 중 dashSpeedMultiplier
     public NetworkVariable<float> speedMultiplier = new NetworkVariable<float>(
-        1f,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server
-    );
+        1f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     public NetworkVariable<bool> dashUnlocked = new NetworkVariable<bool>(
-    false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public NetworkVariable<bool> searchUnlocked = new NetworkVariable<bool>(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
@@ -59,14 +50,18 @@ public class PlayerSkill : NetworkBehaviour
     public NetworkVariable<int> searchUpgradeLevel = new NetworkVariable<int>(
         0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    // 내부 상태 (Owner 전용 — 서버 동기화 불필요)
+    private float dashCooldownRemaining = 0f;
+    private float searchCooldownRemaining = 0f;
+    private readonly List<Outline> activeSearchOutlines = new List<Outline>();
+    private Coroutine searchCoroutine;
 
+    // 현재 강화 레벨에 따라 bonusDuration을 누적 합산하여 실제 지속시간을 계산
     public float EffectiveDashDuration
     {
         get
         {
             float bonus = 0f;
-            if (dashSkillData != null && dashSkillData.upgrades != null)
+            if (dashSkillData?.upgrades != null)
             {
                 int cap = Mathf.Min(dashUpgradeLevel.Value, dashSkillData.upgrades.Length);
                 for (int i = 0; i < cap; i++)
@@ -76,12 +71,13 @@ public class PlayerSkill : NetworkBehaviour
         }
     }
 
+    // 현재 강화 레벨에 따라 bonusRadius를 누적 합산하여 실제 탐색 반경을 계산
     public float EffectiveSearchRadius
     {
         get
         {
             float bonus = 0f;
-            if (searchSkillData != null && searchSkillData.upgrades != null)
+            if (searchSkillData?.upgrades != null)
             {
                 int cap = Mathf.Min(searchUpgradeLevel.Value, searchSkillData.upgrades.Length);
                 for (int i = 0; i < cap; i++)
@@ -91,36 +87,14 @@ public class PlayerSkill : NetworkBehaviour
         }
     }
 
-    private float dashCooldownRemaining = 0f;
-    private float searchCooldownRemaining = 0f;
-
-    // 탐색 스킬로 켠 Outline 목록 (꺼줄 때 추적용)
-    private readonly List<Outline> activeSearchOutlines = new List<Outline>();
-
-    private Coroutine searchCoroutine;
-
-    // Unity 이벤트
-
-    private void Update()
-    {
-        // 내 캐릭터가 아니면 아무것도 하지 않음
-        if (!IsOwner) return;
-
-        TickCooldowns();
-        UpdateCooldownUI();
-        HandleSkillInput();
-    }
-
     public override void OnNetworkSpawn()
     {
-        if (IsOwner && SkillShopManager.Instance != null)
-            SkillShopManager.Instance.RegisterLocalPlayer(this);
+        if (!IsOwner) return;
 
-        if (IsOwner)
-        {
-            dashUnlocked.OnValueChanged += (_, _) => UpdateCooldownUI();
-            searchUnlocked.OnValueChanged += (_, _) => UpdateCooldownUI();
-        }
+        SkillShopManager.Instance?.RegisterLocalPlayer(this);
+        // 해금 여부가 변경되면 즉시 UI를 갱신하여 스킬 슬롯 상태를 반영
+        dashUnlocked.OnValueChanged += (_, _) => UpdateCooldownUI();
+        searchUnlocked.OnValueChanged += (_, _) => UpdateCooldownUI();
     }
 
     public override void OnNetworkDespawn()
@@ -128,7 +102,14 @@ public class PlayerSkill : NetworkBehaviour
         ClearSearchOutlines();
     }
 
-    // 쿨타임 & UI
+    private void Update()
+    {
+        if (!IsOwner) return;
+
+        TickCooldowns();
+        UpdateCooldownUI();
+        HandleSkillInput();
+    }
 
     private void TickCooldowns()
     {
@@ -136,45 +117,39 @@ public class PlayerSkill : NetworkBehaviour
         if (searchCooldownRemaining > 0f) searchCooldownRemaining -= Time.deltaTime;
     }
 
+    // 슬라이더 값은 0=쿨중 / 1=사용가능 범위로 정규화
+    // 해금 + 쿨타임 완료 상태일 때만 슬롯 배경 이미지를 사용가능 스프라이트로 교체
     private void UpdateCooldownUI()
     {
         float dashProgress = 1f - Mathf.Clamp01(dashCooldownRemaining / dashSkillCooldown);
         float searchProgress = 1f - Mathf.Clamp01(searchCooldownRemaining / searchCooldown);
 
-        if (dashCooldownSlider != null)
-            dashCooldownSlider.value = dashProgress;
-        if (searchCooldownSlider != null)
-            searchCooldownSlider.value = searchProgress;
+        if (dashCooldownSlider != null) dashCooldownSlider.value = dashProgress;
+        if (searchCooldownSlider != null) searchCooldownSlider.value = searchProgress;
 
         bool dashReady = dashUnlocked.Value && dashCooldownRemaining <= 0f;
         bool searchReady = searchUnlocked.Value && searchCooldownRemaining <= 0f;
 
         if (dashSlotBg != null && skillLockedSprite != null && skillUnlockedSprite != null)
             dashSlotBg.sprite = dashReady ? skillUnlockedSprite : skillLockedSprite;
-        if (dashSkillIcon != null)
-            dashSkillIcon.SetActive(dashUnlocked.Value);
+        dashSkillIcon?.SetActive(dashUnlocked.Value);
 
         if (searchSlotBg != null && skillLockedSprite != null && skillUnlockedSprite != null)
             searchSlotBg.sprite = searchReady ? skillUnlockedSprite : skillLockedSprite;
-        if (searchSkillIcon != null)
-            searchSkillIcon.SetActive(searchUnlocked.Value);
+        searchSkillIcon?.SetActive(searchUnlocked.Value);
     }
-
-    // 입력 처리
 
     private void HandleSkillInput()
     {
-        // 일시정지 중에는 입력 무시 (PlayerMovement와 동일한 조건)
         if (Cursor.lockState == CursorLockMode.None) return;
 
-        // ── 대시 스킬 ──────────────────────
         if (Input.GetKeyDown(dashSkillKey) && dashUnlocked.Value && dashCooldownRemaining <= 0f)
         {
+            // 쿨타임은 로컬에서 바로 시작하고, 실제 효과는 서버에 요청
             dashCooldownRemaining = dashSkillCooldown;
             ActivateDashSkillServerRpc();
         }
 
-        // ── 탐색 스킬 ──────────────────────
         if (Input.GetKeyDown(searchSkillKey) && searchUnlocked.Value && searchCooldownRemaining <= 0f)
         {
             searchCooldownRemaining = searchCooldown;
@@ -182,14 +157,10 @@ public class PlayerSkill : NetworkBehaviour
         }
     }
 
-    // 대시 스킬 — 서버 권한
-
-    /// 클라이언트가 스킬 발동을 서버에 요청.
-    /// 서버가 speedMultiplier를 올렸다가 duration 후 복원.
     [ServerRpc]
     private void ActivateDashSkillServerRpc()
     {
-        // 이미 대시 중이라면 코루틴 중복 방지
+        // 이전 대시가 남아있을 경우 중복 코루틴 방지를 위해 먼저 중단
         StopCoroutine(nameof(DashSkillRoutine));
         StartCoroutine(DashSkillRoutine());
     }
@@ -201,39 +172,27 @@ public class PlayerSkill : NetworkBehaviour
         speedMultiplier.Value = 1f;
     }
 
-    // 탐색 스킬 — 완전 클라이언트 로컬
-
-    /// 반경 내 음식 오브젝트의 Outline을 켜서 벽 너머로도 보이게 함.
-    /// [Outline 벽 투시 조건]
-    /// Outline 컴포넌트(QuickOutline 등)의 머티리얼이
-    /// ZTest Always로 설정되어 있어야 벽을 뚫고 보임.
-
+    // 탐색 스킬은 아웃라인 시각 효과만 처리하므로 서버 동기화 없이 로컬에서만 실행
+    // OverlapSphere로 범위 안의 음식을 모두 찾아 Outline 컴포넌트를 켜고 searchDuration 후 끔
     private void ActivateSearchSkill()
     {
-        // 기존 탐색 결과 초기화
         ClearSearchOutlines();
         if (searchCoroutine != null) StopCoroutine(searchCoroutine);
 
-        Collider[] hits = Physics.OverlapSphere(transform.position, EffectiveSearchRadius);
-
-        foreach (Collider hit in hits)
+        foreach (Collider hit in Physics.OverlapSphere(transform.position, EffectiveSearchRadius))
         {
             if (!hit.CompareTag("Food")) continue;
 
             Outline outline = hit.GetComponent<Outline>();
-
-            // 만약 음식에 Outline 컴포넌트가 없다면 무시합니다.
             if (outline == null)
             {
-                Debug.LogWarning($"[탐색 스킬] {hit.name}에 Outline 컴포넌트가 없습니다!");
+                Debug.LogWarning($"[탐색 스킬] {hit.name}에 Outline 컴포넌트가 없습니다.");
                 continue;
             }
 
             outline.enabled = true;
             activeSearchOutlines.Add(outline);
         }
-
-        Debug.Log($"[탐색 스킬] 반경 {EffectiveSearchRadius}m 내 음식 {activeSearchOutlines.Count}개 발견");
 
         searchCoroutine = StartCoroutine(SearchDurationRoutine());
     }
@@ -253,83 +212,65 @@ public class PlayerSkill : NetworkBehaviour
         activeSearchOutlines.Clear();
     }
 
+    // 스킬 구매: 공유 알 재화를 소모하고 해당 스킬을 해금
     [ServerRpc]
     public void PurchaseSkillServerRpc(SkillType skillType)
     {
         SkillData data = GetSkillData(skillType);
-        if (data == null) return;
-
-        if (IsUnlocked(skillType))
-        {
-            Debug.Log($"[상점] 이미 해금된 스킬: {skillType}");
-            return;
-        }
+        if (data == null || IsUnlocked(skillType)) return;
 
         if (GameManager.Instance.sharedEggCount.Value < data.unlockCost)
         {
-            Debug.Log($"[상점] 알 부족 | 필요: {data.unlockCost} | 보유: {GameManager.Instance.sharedEggCount.Value}");
+            Debug.Log($"[상점] 알 부족. 필요: {data.unlockCost} / 보유: {GameManager.Instance.sharedEggCount.Value}");
             return;
         }
 
         GameManager.Instance.sharedEggCount.Value -= data.unlockCost;
         SetUnlocked(skillType, true);
-        Debug.Log($"[상점] {data.skillName} 구매 완료 | 남은 알: {GameManager.Instance.sharedEggCount.Value}");
+        Debug.Log($"[상점] {data.skillName} 구매 완료. 남은 알: {GameManager.Instance.sharedEggCount.Value}");
     }
 
+    // 스킬 강화: 현재 레벨의 비용을 소모하고 업그레이드 레벨을 1 증가
+    // upgrades 배열의 인덱스가 곧 강화 레벨이므로 currentLevel을 그대로 인덱스로 사용
     [ServerRpc]
     public void UpgradeSkillServerRpc(SkillType skillType)
     {
         SkillData data = GetSkillData(skillType);
-        if (data == null || data.upgrades == null || data.upgrades.Length == 0) return;
-
-        if (!IsUnlocked(skillType))
-        {
-            Debug.Log($"[상점] 먼저 해금이 필요합니다: {skillType}");
-            return;
-        }
+        if (data?.upgrades == null || data.upgrades.Length == 0) return;
+        if (!IsUnlocked(skillType)) return;
 
         int currentLevel = GetUpgradeLevel(skillType);
-
-        if (currentLevel >= data.upgrades.Length)
-        {
-            Debug.Log($"[상점] 이미 최대 강화: {skillType}");
-            return;
-        }
+        if (currentLevel >= data.upgrades.Length) return;
 
         int cost = data.upgrades[currentLevel].cost;
-
         if (GameManager.Instance.sharedEggCount.Value < cost)
         {
-            Debug.Log($"[상점] 알 부족 | 필요: {cost} | 보유: {GameManager.Instance.sharedEggCount.Value}");
+            Debug.Log($"[상점] 알 부족. 필요: {cost} / 보유: {GameManager.Instance.sharedEggCount.Value}");
             return;
         }
 
         GameManager.Instance.sharedEggCount.Value -= cost;
         SetUpgradeLevel(skillType, currentLevel + 1);
-        Debug.Log($"[상점] {data.skillName} Lv.{currentLevel + 1} 강화 완료 | 남은 알: {GameManager.Instance.sharedEggCount.Value}");
+        Debug.Log($"[상점] {data.skillName} Lv.{currentLevel + 1} 강화 완료.");
     }
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 헬퍼 — 외부(SkillShopManager)에서도 사용
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     public SkillData GetSkillData(SkillType type) => type switch
     {
-        SkillType.Dash => dashSkillData,
+        SkillType.Dash   => dashSkillData,
         SkillType.Search => searchSkillData,
         _ => null
     };
 
     public bool IsUnlocked(SkillType type) => type switch
     {
-        SkillType.Dash => dashUnlocked.Value,
+        SkillType.Dash   => dashUnlocked.Value,
         SkillType.Search => searchUnlocked.Value,
         _ => false
     };
 
     public int GetUpgradeLevel(SkillType type) => type switch
     {
-        SkillType.Dash => dashUpgradeLevel.Value,
+        SkillType.Dash   => dashUpgradeLevel.Value,
         SkillType.Search => searchUpgradeLevel.Value,
         _ => 0
     };
@@ -338,7 +279,7 @@ public class PlayerSkill : NetworkBehaviour
     {
         switch (type)
         {
-            case SkillType.Dash: dashUnlocked.Value = value; break;
+            case SkillType.Dash:   dashUnlocked.Value = value;   break;
             case SkillType.Search: searchUnlocked.Value = value; break;
         }
     }
@@ -347,7 +288,7 @@ public class PlayerSkill : NetworkBehaviour
     {
         switch (type)
         {
-            case SkillType.Dash: dashUpgradeLevel.Value = level; break;
+            case SkillType.Dash:   dashUpgradeLevel.Value = level;   break;
             case SkillType.Search: searchUpgradeLevel.Value = level; break;
         }
     }

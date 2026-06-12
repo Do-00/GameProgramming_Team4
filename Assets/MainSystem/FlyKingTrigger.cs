@@ -3,37 +3,23 @@ using UnityEngine;
 
 public class FlyKingTrigger : MonoBehaviour
 {
-    [Header("È¿°úÀ½")]
+    [Header("ì‚¬ìš´ë“œ")]
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip swallowSound;
 
     private void OnTriggerEnter(Collider other)
     {
-        // ¼­¹ö¿¡¼­¸¸ ¹°¸® Ãæµ¹ ¹× Á¡¼ö °è»ê Ã³¸®¸¦ ÁÖµµÇÕ´Ï´Ù.
         if (!NetworkManager.Singleton.IsServer) return;
+        if (!other.CompareTag("Egg")) return;
 
-        // µé¾î¿Â ¹°Ã¼ÀÇ ÅÂ±×°¡ "Egg" ÀÎÁö È®ÀÎ
-        if (other.CompareTag("Egg"))
-        {
-            NetworkObject eggNetObj = other.GetComponent<NetworkObject>();
+        NetworkObject eggNetObj = other.GetComponent<NetworkObject>();
+        if (eggNetObj == null || !eggNetObj.IsSpawned) return;
 
-            // µé·ÁÀÖ´Â »óÅÂÀÇ ¾ËÀº °­Á¦·Î »¯¾î°¡Áö ¾Êµµ·Ï kinematic Ã¼Å©
-            if (eggNetObj != null && eggNetObj.IsSpawned)
-            {
-                if (other.TryGetComponent(out Rigidbody rb) && rb.isKinematic) return;
+        // í”Œë ˆì´ì–´ê°€ ìš´ë°˜ ì¤‘ì¸ ì•Œ(isKinematic)ì€ ì œì¶œë˜ì§€ ì•Šë„ë¡ ë¬´ì‹œ
+        if (other.TryGetComponent(out Rigidbody rb) && rb.isKinematic) return;
 
-                // 1. °ÔÀÓ¸Å´ÏÀú¿¡ ¾ËÀÌ Á¦ÃâµÇ¾ú´Ù°í Åëº¸ÇÏ¿© Ä«¿îÆ® ¾÷!
-                GameManager.Instance.SubmitEggServerRpc();
-
-                // 2. Èí¼ö »ç¿îµå Àç»ı (¿ÀºêÁ§Æ®°¡ »ç¶óÁö±â Àü¿¡ »ç¿îµå ÇÃ·¹ÀÌ)
-                if (audioSource != null && swallowSound != null)
-                {
-                    audioSource.PlayOneShot(swallowSound);
-                }
-
-                // 3. ¼­¹ö¿¡¼­ ¿ùµåÀÇ ¾ËÀ» ¿ÏÀüÈ÷ »èÁ¦(Despawn) Ã³¸®
-                eggNetObj.Despawn();
-            }
-        }
+        GameManager.Instance.SubmitEggServerRpc();
+        audioSource?.PlayOneShot(swallowSound);
+        eggNetObj.Despawn();
     }
 }

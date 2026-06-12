@@ -5,21 +5,20 @@ using System.Collections;
 
 public class GameOverManager : NetworkBehaviour
 {
-    [Header("UI ±¸¼º ¿ä¼Ò")]
+    [Header("UI ì—°ê²°")]
     [SerializeField] private GameObject gameOverCanvas;
     [SerializeField] private Image targetImage;
 
-    [Header("½Ã³×¸¶Æ½ ¼³Á¤")]
-    [Tooltip("3ÃÊ¸¶´Ù ¹Ù²ğ ÀÌ¹ÌÁöµéÀ» ¿©±â¿¡ ¼ø¼­´ë·Î ³ÖÀ¸¼¼¿ä.")]
+    [Header("ì´ë¯¸ì§€ ìŠ¬ë¼ì´ë“œì‡¼")]
+    [Tooltip("ìˆœì„œëŒ€ë¡œ í‘œì‹œí•  ìŠ¤í”„ë¼ì´íŠ¸ ë°°ì—´")]
     [SerializeField] private Sprite[] sequenceSprites;
-    [SerializeField] private float timePerImage = 3.0f; // 3ÃÊ °£°İ
+    [SerializeField] private float timePerImage = 3.0f;
 
-    // GameManager°¡ È£ÃâÇÏ´Â ÇÔ¼ö
+    // ì„œë²„ì—ì„œ ê²Œì„ì˜¤ë²„ê°€ í™•ì •ë˜ë©´ ì´ í•¨ìˆ˜ë¡œ ëª¨ë“  í´ë¼ì´ì–¸íŠ¸ì— UI í‘œì‹œë¥¼ ìš”ì²­
     public void TriggerGameOverUI()
     {
         if (!IsServer) return;
 
-        // ¸ğµç Å¬¶óÀÌ¾ğÆ®ÀÇ È­¸éÀ» ¶ç¿ó´Ï´Ù.
         ShowGameOverUIClientRpc();
     }
 
@@ -27,43 +26,36 @@ public class GameOverManager : NetworkBehaviour
     private void ShowGameOverUIClientRpc()
     {
         if (AudioManager.Instance != null)
-        {
             AudioManager.Instance.StopBGM();
-        }
 
-        if (gameOverCanvas != null) gameOverCanvas.SetActive(true);
+        if (gameOverCanvas != null)
+            gameOverCanvas.SetActive(true);
 
-        // ÄÚ·çÆ¾À¸·Î ÀÌ¹ÌÁö¸¦ ¼øÂ÷ÀûÀ¸·Î ¹Ù²ß´Ï´Ù.
         if (sequenceSprites.Length > 0 && targetImage != null)
-        {
-            StartCoroutine(ClientImageSequenceRoutine());
-        }
+            StartCoroutine(ImageSequenceRoutine());
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
     }
 
-    private IEnumerator ClientImageSequenceRoutine()
+    // ë°°ì—´ì— ë‹´ê¸´ ìŠ¤í”„ë¼ì´íŠ¸ë¥¼ ìˆœì„œëŒ€ë¡œ êµì²´í•˜ë©° ìŠ¬ë¼ì´ë“œì‡¼ ì¬ìƒ
+    private IEnumerator ImageSequenceRoutine()
     {
-        for (int i = 0; i < sequenceSprites.Length; i++)
+        foreach (Sprite sprite in sequenceSprites)
         {
-            targetImage.sprite = sequenceSprites[i];
+            targetImage.sprite = sprite;
             yield return new WaitForSeconds(timePerImage);
         }
     }
 
-    // ·Îºñ·Î µ¹¾Æ¿Â Á÷ÈÄ Äµ¹ö½º¸¦ ²¨ÁÖ±â À§ÇÑ ÇÔ¼ö
+    // ë¡œë¹„ ë³µê·€ ì§ì „ì— ì„œë²„ê°€ í˜¸ì¶œí•˜ì—¬ ê²Œì„ì˜¤ë²„ UIë¥¼ ìˆ¨ê¸°ê³  BGMì„ ì¬ê°œ
     [ClientRpc]
     public void HideGameOverUIClientRpc()
     {
         if (gameOverCanvas != null)
-        {
             gameOverCanvas.SetActive(false);
-        }
 
         if (AudioManager.Instance != null)
-        {
             AudioManager.Instance.PlayBGM();
-        }
     }
 }

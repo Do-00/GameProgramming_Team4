@@ -15,23 +15,23 @@ public class MonsterCatAI : NetworkBehaviour
     [SerializeField] private float rotateSpeed = 10f;
 
     [Header("행동 설정")]
-    [SerializeField] private float stareDuration = 1.5f;   // 플레이어를 발견하고 노려보는 시간
-    [SerializeField] private float pauseDuration = 0.5f;   // 돌진 직전 잠깐 멈추는 시간
+    [SerializeField] private float stareDuration = 1.5f;
+    [SerializeField] private float pauseDuration = 0.5f;
 
     [Header("지상 돌진 설정")]
     [SerializeField] private float pounceInitialSpeed = 40f;
-    [SerializeField] private float pounceFriction = 3f;    // 돌진 후 속도 감쇠 계수
+    [SerializeField] private float pounceFriction = 3f;
 
     [Header("공중 점프 설정")]
-    [SerializeField] private float airAttackThreshold = 2f;    // 이 값 이상 높이 차이가 나면 점프 공격
-    [SerializeField] private float jumpArcOffset = 1.5f;       // 포물선 높이에 추가하는 여유값
+    [SerializeField] private float airAttackThreshold = 2f;
+    [SerializeField] private float jumpArcOffset = 1.5f;
     [SerializeField] private float maxJumpHeight = 8f;
-    [SerializeField] private float jumpGravityMultiplier = 3f; // 점프 전용 중력 배율 (빠른 낙하)
-    [SerializeField] private float jumpOvershootRatio = 0.2f;  // 목표 지점을 조금 넘겨 스치듯 지나가게 함
+    [SerializeField] private float jumpGravityMultiplier = 3f;
+    [SerializeField] private float jumpOvershootRatio = 0.2f;
 
     [Header("공격 데미지 설정")]
-    [SerializeField] private float dashDamage = 80f;    // 지상 돌진 충돌 시 데미지
-    [SerializeField] private float airJumpDamage = 40f; // 공중 점프 충돌 시 데미지 (낮은 쪽)
+    [SerializeField] private float dashDamage = 80f;
+    [SerializeField] private float airJumpDamage = 40f;
 
     [Header("충돌 & 기절 설정")]
     [SerializeField] private float stunDuration = 5f;
@@ -52,7 +52,7 @@ public class MonsterCatAI : NetworkBehaviour
     private Transform targetPlayer;
     private Vector3 lockedTargetPos;
     private bool isJumpingAttack = false;
-    private bool canStunFromCollision = false; // 돌진 직후 짧은 시간은 충돌 판정 제외
+    private bool canStunFromCollision = false;
 
     private AudioSource audioSource;
     public AudioClip attackSound;
@@ -67,7 +67,6 @@ public class MonsterCatAI : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        // 모든 클라이언트가 상태 변화를 수신하여 조명과 애니메이션을 동기화
         currentState.OnValueChanged += OnCatStateChanged;
         UpdateCatLight(false);
 
@@ -80,7 +79,6 @@ public class MonsterCatAI : NetworkBehaviour
         currentState.OnValueChanged -= OnCatStateChanged;
     }
 
-    // 상태 머신: 각 상태 코루틴이 완료되면 다음 상태로 자동 전환
     private IEnumerator AILoop()
     {
         while (true)
@@ -108,7 +106,6 @@ public class MonsterCatAI : NetworkBehaviour
                 Transform potentialTarget = hits[0].transform;
                 int sightMask = playerLayer | obstacleLayer;
 
-                // 장애물에 가로막힌 플레이어는 감지하지 않도록 시야 직선 체크
                 if (Physics.Linecast(transform.position + Vector3.up * 1f, potentialTarget.position, out RaycastHit hit, sightMask)
                     && hit.collider.CompareTag("Player"))
                 {
@@ -121,8 +118,6 @@ public class MonsterCatAI : NetworkBehaviour
         }
     }
 
-    // 발견 후 플레이어를 향해 천천히 회전하며 노려봄
-    // stareDuration 동안 바라본 뒤 Preparing 상태로 전환
     private IEnumerator HandleStaringState()
     {
         rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0);
@@ -148,8 +143,6 @@ public class MonsterCatAI : NetworkBehaviour
         currentState.Value = targetPlayer != null ? CatState.Preparing : CatState.Idle;
     }
 
-    // 돌진 방향을 결정하는 준비 단계
-    // 목표와의 높이 차이를 기준으로 지상 돌진 / 공중 점프를 선택
     private IEnumerator HandlePreparingState()
     {
         if (targetPlayer == null)
@@ -173,9 +166,6 @@ public class MonsterCatAI : NetworkBehaviour
         currentState.Value = CatState.Charging;
     }
 
-    // 포물선 운동 공식으로 초기 속도를 계산하여 목표 지점까지 날아가는 점프 공격
-    // 수평 속도 = 수평 이동 거리 / 총 비행 시간
-    // 수직 속도 = sqrt(2 * g * h), 비행 시간 = 상승 시간 + 하강 시간
     private IEnumerator HandleChargingState()
     {
         canStunFromCollision = false;
@@ -187,16 +177,13 @@ public class MonsterCatAI : NetworkBehaviour
             Vector3 displacement = lockedTargetPos - transform.position;
             Vector3 displacementXZ = new Vector3(displacement.x, 0, displacement.z);
 
-            // jumpOvershootRatio만큼 목표를 넘어가도록 수평 거리를 늘림
             if (displacementXZ.magnitude > 0.1f)
                 displacementXZ += displacementXZ * jumpOvershootRatio;
 
-            // 포물선 최고점 높이: 목표 높이차 + 여유값, 단 maxJumpHeight 초과 불가
             float h = Mathf.Clamp(displacement.y + jumpArcOffset, 2f, maxJumpHeight);
             float baseGravity = Mathf.Abs(Physics.gravity.y);
             float jumpGravity = baseGravity * jumpGravityMultiplier;
 
-            // 에너지 보존 법칙으로 초기 수직 속도 산출
             float velocityY = Mathf.Sqrt(2 * jumpGravity * h);
             float timeUp = Mathf.Sqrt(2 * h / jumpGravity);
             float fallHeight = Mathf.Max(0, h - displacement.y);
@@ -205,14 +192,12 @@ public class MonsterCatAI : NetworkBehaviour
 
             rb.linearVelocity = displacementXZ / totalAirTime + Vector3.up * velocityY;
 
-            // 이륙 직후 잠깐은 충돌 무시 (바닥과 즉시 충돌하여 기절하지 않도록)
             yield return new WaitForSeconds(0.2f);
             canStunFromCollision = true;
 
             float timer = totalAirTime;
             while (timer > 0 && currentState.Value == CatState.Charging)
             {
-                // Unity 기본 중력 외에 추가 중력을 매 물리 프레임 적용하여 빠른 낙하 구현
                 rb.AddForce(Vector3.down * baseGravity * (jumpGravityMultiplier - 1f), ForceMode.Acceleration);
                 timer -= Time.fixedDeltaTime;
                 yield return new WaitForFixedUpdate();
@@ -233,7 +218,6 @@ public class MonsterCatAI : NetworkBehaviour
             float currentSpeed = pounceInitialSpeed;
             while (currentSpeed > 0.1f && currentState.Value == CatState.Charging)
             {
-                // 마찰력을 Lerp로 표현하여 속도를 점진적으로 감소
                 currentSpeed = Mathf.Lerp(currentSpeed, 0f, Time.fixedDeltaTime * pounceFriction);
                 rb.linearVelocity = new Vector3(groundDir.x * currentSpeed, rb.linearVelocity.y, groundDir.z * currentSpeed);
                 yield return new WaitForFixedUpdate();
@@ -253,8 +237,6 @@ public class MonsterCatAI : NetworkBehaviour
         currentState.Value = CatState.Idle;
     }
 
-    // 장애물에 충돌하면 즉시 기절
-    // canStunFromCollision 플래그로 돌진 시작 직후의 오탐(바닥 등)을 걸러냄
     private void OnCollisionEnter(Collision collision)
     {
         if (!IsServer || !canStunFromCollision) return;
@@ -268,7 +250,6 @@ public class MonsterCatAI : NetworkBehaviour
         }
     }
 
-    // 플레이어와 겹치면 데미지 적용 (OnCollisionEnter와 달리 트리거로 처리)
     private void OnTriggerEnter(Collider other)
     {
         if (!IsServer) return;
@@ -283,7 +264,6 @@ public class MonsterCatAI : NetworkBehaviour
         }
     }
 
-    // 공격적인 상태(Staring, Preparing, Charging)일 때 눈에서 빛이 나도록 조명을 제어
     private void UpdateCatLight(bool turnOn)
     {
         if (catEyeLight != null)
@@ -295,8 +275,6 @@ public class MonsterCatAI : NetworkBehaviour
         glowEffect?.SetActive(turnOn);
     }
 
-    // NetworkVariable 변경 이벤트: 서버뿐 아니라 모든 클라이언트에서 호출됨
-    // 조명과 애니메이터 파라미터를 상태에 맞게 갱신
     private void OnCatStateChanged(CatState oldState, CatState newState)
     {
         bool isAggressive = newState == CatState.Staring

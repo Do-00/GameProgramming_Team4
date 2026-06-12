@@ -10,9 +10,9 @@ public class MonsterSpiderAI : NetworkBehaviour
 
     [Header("AI 설정")]
     [SerializeField] private float detectionRadius = 15f;
-    [SerializeField] private float chaseRadius = 25f;        // 이 거리를 벗어나면 추적 포기
+    [SerializeField] private float chaseRadius = 25f;
     [SerializeField] private LayerMask playerLayer;
-    [SerializeField] private float temporaryChaseDuration = 7f; // 거미줄 알림으로 인한 임시 추적 시간
+    [SerializeField] private float temporaryChaseDuration = 7f;
 
     [Header("이동 설정")]
     [SerializeField] private float patrolSpeed = 5f;
@@ -22,14 +22,14 @@ public class MonsterSpiderAI : NetworkBehaviour
     [Header("공격 설정")]
     [SerializeField] private float attackRange = 2.5f;
     [SerializeField] private float attackDamage = 30f;
-    [SerializeField] private float pauseDuration = 0.5f;   // 공격 전 멈칫하는 시간
+    [SerializeField] private float pauseDuration = 0.5f;
     [SerializeField] private float attackCooldown = 2.0f;
 
     [Header("거미줄 설치 설정")]
     [SerializeField] private GameObject webPrefab;
     [SerializeField] private float webDropInterval = 5f;
-    [SerializeField] private float minWebDistance = 10f;    // 기존 거미줄로부터 이 거리 이내면 설치 안 함
-    [SerializeField] private int maxWebs = 10;              // 동시에 존재할 수 있는 최대 거미줄 수
+    [SerializeField] private float minWebDistance = 10f;
+    [SerializeField] private int maxWebs = 10;
     [SerializeField] private LayerMask wallLayer;
     [SerializeField] private float maxWebLength = 15f;
     [SerializeField] private float webMinHeight = 1f;
@@ -43,7 +43,6 @@ public class MonsterSpiderAI : NetworkBehaviour
     private Vector3 currentPatrolDir;
     private float patrolChangeTimer = 0f;
 
-    // isProximityChase: 플레이어를 직접 감지해서 추격 시작한 경우 (거미줄 알림과 구분)
     private bool isProximityChase = false;
     private float chaseTimer = 0f;
 
@@ -60,7 +59,6 @@ public class MonsterSpiderAI : NetworkBehaviour
         StartCoroutine(AILoop());
     }
 
-    // 상태 머신: 각 상태 코루틴이 완료되면 다음 상태로 자동 전환
     private IEnumerator AILoop()
     {
         while (true)
@@ -94,7 +92,6 @@ public class MonsterSpiderAI : NetworkBehaviour
 
             MoveTowards(currentPatrolDir, patrolSpeed);
 
-            // 거미줄을 일정 주기로 설치 시도, 조건 불충족 시 0.5초 후 재시도
             webTimer += Time.deltaTime;
             if (webTimer >= webDropInterval)
             {
@@ -118,7 +115,6 @@ public class MonsterSpiderAI : NetworkBehaviour
 
             float dist = Vector3.Distance(transform.position, targetPlayer.position);
 
-            // 공격 사거리 안으로 들어오면 추적 중단하고 공격
             if (dist <= attackRange)
             {
                 currentState.Value = SpiderState.Attack;
@@ -129,7 +125,6 @@ public class MonsterSpiderAI : NetworkBehaviour
 
             if (isProximityChase)
             {
-                // 근접 감지 추격: 추격 반경을 벗어나면 포기
                 if (dist > chaseRadius)
                 {
                     targetPlayer = null;
@@ -139,7 +134,6 @@ public class MonsterSpiderAI : NetworkBehaviour
             }
             else
             {
-                // 거미줄 알림 추격: 시간 제한이 끝나면 포기
                 chaseTimer -= Time.deltaTime;
                 if (chaseTimer <= 0f)
                 {
@@ -156,14 +150,12 @@ public class MonsterSpiderAI : NetworkBehaviour
 
     private IEnumerator HandleAttackState()
     {
-        // 공격 직전 멈춤 → 피격 판정 → 쿨타임 순으로 진행
         rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0);
         yield return new WaitForSeconds(pauseDuration);
 
         if (targetPlayer != null)
         {
             float dist = Vector3.Distance(transform.position, targetPlayer.position);
-            // 멈칫하는 동안 플레이어가 도망쳤을 경우를 대비해 +1 여유 판정
             if (dist <= attackRange + 1f)
             {
                 PlayerMovement player = targetPlayer.GetComponent<PlayerMovement>();
@@ -197,10 +189,6 @@ public class MonsterSpiderAI : NetworkBehaviour
         patrolChangeTimer = Random.Range(2f, 5f);
     }
 
-    // 거미줄 설치 알고리즘:
-    // 1. 스파이더 좌우로 레이캐스트를 쏴서 양쪽 벽을 감지
-    // 2. 두 벽 사이 거리가 2 이상이면 거미줄을 해당 위치에 스폰
-    // 3. 기존 거미줄과 너무 가깝거나 최대 개수를 초과하면 가장 오래된 것을 제거
     private bool TryDropWeb()
     {
         activeWebsList.RemoveAll(web => web == null || !web.IsSpawned);
@@ -240,7 +228,6 @@ public class MonsterSpiderAI : NetworkBehaviour
         webObj.GetComponent<SpiderWeb>()?.InitializeLine(this, startPos, endPos);
         activeWebsList.Add(netObj);
 
-        // 최대 개수 초과 시 가장 먼저 설치된 거미줄(인덱스 0)을 제거
         int limit = maxWebs <= 0 ? 10 : maxWebs;
         if (activeWebsList.Count > limit)
         {
@@ -250,10 +237,10 @@ public class MonsterSpiderAI : NetworkBehaviour
         }
     }
 
-    // 거미줄(SpiderWeb)에 플레이어가 걸렸을 때 거미줄이 이 함수를 호출하여 추격 시작
-    // 근접 감지 추격 중이면 우선순위가 높으므로 알림을 무시
+    /// <summary>거미줄에 걸린 플레이어가 거미에게 알림 (SpiderWeb에서 호출)</summary>
     public void AlertByWeb(Transform player)
     {
+        // 이미 근접 추격 중이면 무시
         if (currentState.Value == SpiderState.Chase && isProximityChase) return;
 
         targetPlayer = player;

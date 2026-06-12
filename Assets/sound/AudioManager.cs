@@ -11,7 +11,7 @@ public class AudioManager : MonoBehaviour
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject); // ¾ÀÀÌ ¹Ù²î¾îµµ À½¾ÇÀº ¾È ²¨Áü
+            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -19,25 +19,21 @@ public class AudioManager : MonoBehaviour
         }
     }
 
-    // ? Ã³À½ºÎÅÍ ´Ù½Ã Àç»ıÇÏ´Â ÇÔ¼ö Ãß°¡
+    /// <summary>BGMì„ ì²˜ìŒë¶€í„° ì¬ìƒ</summary>
     public void PlayBGM()
     {
-        if (bgmSource != null)
-        {
-            bgmSource.time = 0f; // Àç»ı À§Ä¡¸¦ ¸Ç Ã³À½(0ÃÊ)À¸·Î µÇµ¹¸²
-            bgmSource.Play();    // Àç»ı ½ÃÀÛ
-        }
+        if (bgmSource == null) return;
+        bgmSource.time = 0f;
+        bgmSource.Play();
     }
 
+    /// <summary>BGMì„ ì¦‰ì‹œ ì •ì§€</summary>
     public void StopBGM()
     {
-        if (bgmSource != null)
-        {
-            bgmSource.Stop();
-        }
+        bgmSource?.Stop();
     }
 
-    // ³ªÁß¿¡ ¼­¼­È÷ ÀÛ¾ÆÁö´Â ÆäÀÌµå ¾Æ¿ô ±â´ÉÀÌ ÇÊ¿äÇÏ¸é ¾Æ·¡ ÇÔ¼ö¸¦ ¾²¼¼¿ä
+    /// <summary>BGMì„ ì§€ì • ì‹œê°„ ë™ì•ˆ í˜ì´ë“œì•„ì›ƒ í›„ ì •ì§€</summary>
     public void FadeOutBGM(float duration)
     {
         StartCoroutine(FadeOutRoutine(duration));
@@ -46,11 +42,13 @@ public class AudioManager : MonoBehaviour
     private System.Collections.IEnumerator FadeOutRoutine(float duration)
     {
         float startVolume = bgmSource.volume;
+
         while (bgmSource.volume > 0)
         {
             bgmSource.volume -= startVolume * Time.deltaTime / duration;
             yield return null;
         }
+
         bgmSource.Stop();
         bgmSource.volume = startVolume;
     }

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USER\\\\Desktop\\\\Game_Program_Team4\\\\GameProgramming_Team4\\\\GameProgramming_Team4\" -Recurse -Force)",
+      "Bash(Select-Object -Property FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(dir \"C:\\\\Users\\\\USER\\\\Desktop\\\\Game_Program_Team4\\\\GameProgramming_Team4\\\\GameProgramming_Team4\" -d)"
+    ]
+  }
+}

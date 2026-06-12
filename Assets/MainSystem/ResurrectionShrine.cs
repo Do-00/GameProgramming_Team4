@@ -5,51 +5,39 @@ using TMPro;
 
 public class ResurrectionShrine : NetworkBehaviour
 {
-    [Header("ºÎÈ° ¼³Á¤")]
-    [SerializeField] private int baseCost = 2; // Ã³À½ ºÎÈ° ½Ã ÇÊ¿äÇÑ ¾Ë °³¼ö
-    [SerializeField] private int costIncrement = 2; // ´ÙÀ½ ºÎÈ°¸¶´Ù Ãß°¡·Î ¿ä±¸µÇ´Â ¾Ë °³¼ö
-    [SerializeField] private Transform revivePoint; // ÇÃ·¹ÀÌ¾î°¡ ½ºÆùµÉ Á¦´Ü ¾Õ À§Ä¡
+    [Header("ë¶€í™œ ë¹„ìš©")]
+    [SerializeField] private int baseCost = 2;       // ì²« ë¶€í™œ ë¹„ìš©
+    [SerializeField] private int costIncrement = 2;  // ë¶€í™œí•  ë•Œë§ˆë‹¤ ì¶”ê°€ë˜ëŠ” ë¹„ìš©
+    [SerializeField] private Transform revivePoint;
 
-    [Header("UI ¼³Á¤")]
-    [SerializeField] private TextMeshProUGUI shrineText; // Á¦´Ü À§¿¡ ¶ç¿ï ÅØ½ºÆ®
-    [SerializeField] private float textVisibleDistance = 7f; // ÅØ½ºÆ®°¡ º¸ÀÌ´Â °Å¸®
+    [Header("UI ì—°ê²°")]
+    [SerializeField] private TextMeshProUGUI shrineText;
+    [SerializeField] private float textVisibleDistance = 7f;
 
-    // ³×Æ®¿öÅ© µ¿±âÈ­ º¯¼öµé
     private NetworkVariable<int> reviveCount = new NetworkVariable<int>(0);
     private NetworkVariable<int> currentEggsInShrine = new NetworkVariable<int>(0);
 
-    // Á¦´Ü ±¸¿ª ¾È¿¡ µé¾î¿Â ¾ËµéÀ» ÃßÀûÇÏ´Â ¸®½ºÆ® (¼­¹ö Àü¿ë)
+    // íŠ¸ë¦¬ê±° ì˜ì—­ ì•ˆì— ë“¤ì–´ì™€ ìˆëŠ” ì•Œ ëª©ë¡ (ì„œë²„ ì „ìš©)
     private List<NetworkObject> eggList = new List<NetworkObject>();
 
-    void Update()
+    private void Update()
     {
         if (shrineText == null) return;
 
-        // ÇöÀç ÇÊ¿äÇÑ ¾Ë °³¼ö °è»ê
-        int requiredEggs = baseCost + (reviveCount.Value * costIncrement);
+        int requiredEggs = GetRequiredEggs();
 
-        // ·ÎÄÃ ÇÃ·¹ÀÌ¾î¿ÍÀÇ °Å¸®¸¦ °è»êÇÏ¿© ÅØ½ºÆ® Ç¥½Ã/¼û±è Ã³¸®
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClient != null)
+        var localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
+        if (localPlayer != null)
         {
-            var localPlayer = NetworkManager.Singleton.LocalClient.PlayerObject;
-            if (localPlayer != null)
-            {
-                float dist = Vector3.Distance(transform.position, localPlayer.transform.position);
-                if (dist <= textVisibleDistance)
-                {
-                    shrineText.enabled = true;
-                    // Á¶°Ç ´Ş¼º ¿©ºÎ¿¡ µû¶ó »ö»óÀ» ´Ù¸£°Ô Ç¥½ÃÇÒ ¼öµµ ÀÖ½À´Ï´Ù.
-                    shrineText.text = $"[ºÎÈ° Á¦´Ü]\nÇÊ¿äÇÑ ¾Ë: ({currentEggsInShrine.Value} / {requiredEggs})";
-                }
-                else
-                {
-                    shrineText.enabled = false;
-                }
-            }
+            float dist = Vector3.Distance(transform.position, localPlayer.transform.position);
+            shrineText.enabled = dist <= textVisibleDistance;
+
+            if (shrineText.enabled)
+                shrineText.text = $"[ë¶€í™œ ì œë‹¨]\ní•„ìš”í•œ ì•Œ: ({currentEggsInShrine.Value} / {requiredEggs})";
         }
     }
 
-    // ¹°¸®ÀûÀ¸·Î Á¦´Ü¿¡ ¾ËÀÌ µé¾î¿ÔÀ» ¶§ Ä«¿îÆ®
+    // ì•Œì´ íŠ¸ë¦¬ê±°ì— ë“¤ì–´ì˜¤ë©´ eggListì— ì¶”ê°€í•˜ê³  NetworkVariableë¡œ ë™ê¸°í™”
     private void OnTriggerEnter(Collider other)
     {
         if (!IsServer) return;
@@ -65,7 +53,6 @@ public class ResurrectionShrine : NetworkBehaviour
         }
     }
 
-    // ´©±º°¡ Á¦´Ü ¹ÛÀ¸·Î ¾ËÀ» ´Ù½Ã ÁÖ¿ö¼­ »©°¬À» ¶§ Ä«¿îÆ® Â÷°¨
     private void OnTriggerExit(Collider other)
     {
         if (!IsServer) return;
@@ -73,65 +60,62 @@ public class ResurrectionShrine : NetworkBehaviour
         if (other.CompareTag("Egg"))
         {
             NetworkObject netObj = other.GetComponent<NetworkObject>();
-            if (netObj != null && eggList.Contains(netObj))
-            {
-                eggList.Remove(netObj);
+            if (netObj != null && eggList.Remove(netObj))
                 currentEggsInShrine.Value = eggList.Count;
-            }
         }
     }
 
-    // ÇÃ·¹ÀÌ¾î°¡ Á¦´ÜÀÇ ½ºÀ§Ä¡¸¦ ´­·¶À» ¶§ ÀÛµ¿ÇÏ´Â ¼­¹ö ·ÎÁ÷
+    // ë¶€í™œ ë²„íŠ¼ì„ í”Œë ˆì´ì–´ê°€ Eí‚¤ë¡œ ëˆŒë €ì„ ë•Œ ì„œë²„ì—ì„œ ì²˜ë¦¬
+    // ì²˜ë¦¬ ìˆœì„œ: ë””ìŠ¤í°ëœ ì•Œ ì •ë¦¬ â†’ ë¹„ìš© ê²€ì‚¬ â†’ ëŒ€ìƒ ì„ ì • â†’ ì•Œ ì†Œëª¨ â†’ ë¶€í™œ
     [ServerRpc(RequireOwnership = false)]
     public void InteractReviveButtonServerRpc()
     {
         if (!IsServer) return;
 
-        // ÆÄ±«µÇ°Å³ª µğ½ºÆùµÈ ¾ËÀÌ ¸®½ºÆ®¿¡ ³²¾ÆÀÖÀ» ¼ö ÀÖÀ¸¹Ç·Î Á¤¸®
+        // ëˆ„êµ°ê°€ ì•Œì„ ì§‘ì–´ê°€ê±°ë‚˜ ì´ë¯¸ Despawnëœ ì•Œì´ ëª©ë¡ì— ë‚¨ì•„ìˆì„ ìˆ˜ ìˆìœ¼ë¯€ë¡œ ë¨¼ì € ì •ë¦¬
         eggList.RemoveAll(egg => egg == null || !egg.IsSpawned);
         currentEggsInShrine.Value = eggList.Count;
 
-        int requiredEggs = baseCost + (reviveCount.Value * costIncrement);
+        int requiredEggs = GetRequiredEggs();
 
-        if (currentEggsInShrine.Value >= requiredEggs)
+        if (currentEggsInShrine.Value < requiredEggs)
         {
-            PlayerMovement targetPlayer = GetFirstDeadPlayer();
-
-            if (targetPlayer != null)
-            {
-                // 1. ÇÊ¿äÇÑ °³¼ö¸¸Å­¸¸ ¾ËÀ» ¼Ò¸ğ(ÆÄ±«)ÇÕ´Ï´Ù.
-                for (int i = 0; i < requiredEggs; i++)
-                {
-                    eggList[i].Despawn();
-                }
-                eggList.RemoveRange(0, requiredEggs);
-                currentEggsInShrine.Value = eggList.Count;
-
-                // 2. ºÎÈ° ¿ä±¸Ä¡ Áõ°¡ ¹× ÇÃ·¹ÀÌ¾î ºÎÈ° ½ÇÇà
-                reviveCount.Value++;
-                targetPlayer.ReviveServerRpc(revivePoint.position);
-
-                Debug.Log($"[ºÎÈ° Á¦´Ü] ÇÃ·¹ÀÌ¾î ºÎÈ° ¼º°ø! ´ÙÀ½ ¿ä±¸·®: {baseCost + (reviveCount.Value * costIncrement)}°³");
-            }
-            else
-            {
-                Debug.Log("[ºÎÈ° Á¦´Ü] Á×Àº ÆÀ¿øÀÌ ¾ø½À´Ï´Ù!");
-            }
+            Debug.Log("[ë¶€í™œ ì œë‹¨] ì•Œì´ ë¶€ì¡±í•©ë‹ˆë‹¤.");
+            return;
         }
-        else
+
+        PlayerMovement targetPlayer = GetFirstDeadPlayer();
+        if (targetPlayer == null)
         {
-            Debug.Log("[ºÎÈ° Á¦´Ü] ¾ËÀÌ ºÎÁ·ÇÕ´Ï´Ù!");
+            Debug.Log("[ë¶€í™œ ì œë‹¨] ì‚¬ë§í•œ í”Œë ˆì´ì–´ê°€ ì—†ìŠµë‹ˆë‹¤.");
+            return;
         }
+
+        // ëª©ë¡ ì•ìª½ë¶€í„° requiredEggsê°œë¥¼ ì†Œëª¨
+        for (int i = 0; i < requiredEggs; i++)
+            eggList[i].Despawn();
+
+        eggList.RemoveRange(0, requiredEggs);
+        currentEggsInShrine.Value = eggList.Count;
+
+        reviveCount.Value++;
+        targetPlayer.ReviveServerRpc(revivePoint.position);
+
+        Debug.Log($"[ë¶€í™œ ì œë‹¨] ë¶€í™œ ì™„ë£Œ. ë‹¤ìŒ ë¶€í™œ ë¹„ìš©: {GetRequiredEggs()}ê°œ");
     }
 
-    // °¡Àå ¸ÕÀú Á×Àº(timeOfDeath°¡ °¡Àå ÀÛÀº) ÇÃ·¹ÀÌ¾î¸¦ Ã£´Â ·ÎÁ÷
+    // ë¶€í™œ ë¹„ìš© = ê¸°ë³¸ê°’ + (ì§€ê¸ˆê¹Œì§€ ë¶€í™œ íšŸìˆ˜ Ã— ì¦ê°€ëŸ‰)
+    // reviveCountëŠ” ë¶€í™œ ì„±ê³µ í›„ ì¦ê°€í•˜ë¯€ë¡œ ë‹¤ìŒ ë¹„ìš©ì€ í•­ìƒ ì´ë²ˆ ë¹„ìš©ë³´ë‹¤ ë†’ìŒ
+    private int GetRequiredEggs() => baseCost + (reviveCount.Value * costIncrement);
+
+    // ì‚¬ë§í•œ í”Œë ˆì´ì–´ ì¤‘ ê°€ì¥ ë¨¼ì € ì£½ì€ ì‚¬ëŒì„ ìš°ì„  ë¶€í™œ
+    // timeOfDeath(Time.time ê¸°ì¤€)ê°€ ì‘ì„ìˆ˜ë¡ ë¨¼ì € ì£½ì€ ê²ƒ
     private PlayerMovement GetFirstDeadPlayer()
     {
-        PlayerMovement[] allPlayers = FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None);
         PlayerMovement firstDead = null;
         float oldestTime = float.MaxValue;
 
-        foreach (PlayerMovement p in allPlayers)
+        foreach (PlayerMovement p in FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None))
         {
             if (p.isDead.Value && p.timeOfDeath.Value < oldestTime)
             {

@@ -6,15 +6,19 @@ public class GameManager : NetworkBehaviour
 {
     public static GameManager Instance;
 
-    [Header("UI ¿¬µ¿")]
-    // ? [»õ·Î Ãß°¡µÊ] ÀÎ½ºÆåÅÍ¿¡¼­ GameOverManager¸¦ µå·¡±×ÇØ¼­ ¿¬°áÇØÁÖ¼¼¿ä.
+    // ë§µ ìŠ¤í° í›„ ë¬¼ë¦¬ ì—°ì‚°ì´ ì •ì°©ë  ë•Œê¹Œì§€ ê¸°ë‹¤ë¦¬ëŠ” ì‹œê°„
+    private const float MapSpawnDelay = 0.15f;
+    // ê²Œì„ì˜¤ë²„ UI ì´ë¯¸ì§€ ìŠ¬ë¼ì´ë“œì‡¼ê°€ ëë‚œ ë’¤ ë¡œë¹„ë¡œ ëŒì•„ê°€ê¸°ê¹Œì§€ ëŒ€ê¸° ì‹œê°„
+    private const float GameOverReturnDelay = 10f;
+
+    [Header("UI ì—°ê²°")]
     [SerializeField] private GameOverManager gameOverManager;
 
-    [Header("ÆÀ¿ø °øÀ¯ µ¥ÀÌÅÍ")]
+    [Header("ê³µìœ  ì¬í™”")]
     public NetworkVariable<int> sharedEggCount = new NetworkVariable<int>(
         100, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    [Header("ÇÒ´ç·®(Quota) ½Ã½ºÅÛ ¼³Á¤")]
+    [Header("ë¼ìš´ë“œ & í• ë‹¹ëŸ‰")]
     public NetworkVariable<int> currentRound = new NetworkVariable<int>(
         1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public NetworkVariable<int> quotaRequired = new NetworkVariable<int>(
@@ -25,7 +29,7 @@ public class GameManager : NetworkBehaviour
     [HideInInspector]
     public Vector3 startRoomPosition;
 
-    [Header("·Îºñ ¹× ¸Ê ¼³Á¤")]
+    [Header("ë§µ ìŠ¤í° ì„¤ì •")]
     [SerializeField] private GameObject houseMapPrefab;
     [SerializeField] private Transform lobbySpawnPoint;
     [SerializeField] private Transform playMapSpawnPoint;
@@ -40,38 +44,32 @@ public class GameManager : NetworkBehaviour
         else Destroy(gameObject);
     }
 
+    // ì”¬ì— ë°°ì¹˜ëœ ëª©í‘œ ë²„íŠ¼(ì¶œë°œ/ê·€í™˜)ê³¼ ìƒí˜¸ì‘ìš©í•  ë•Œ í´ë¼ì´ì–¸íŠ¸ê°€ ì„œë²„ì— í˜¸ì¶œ
+    // ê²Œì„ ì¤‘ì´ ì•„ë‹ˆë©´ ë¼ìš´ë“œë¥¼ ì‹œì‘í•˜ê³ , ê²Œì„ ì¤‘ì´ë©´ í• ë‹¹ëŸ‰ì„ ê²€ì‚¬í•´ ê·€í™˜ ì²˜ë¦¬
     [ServerRpc(RequireOwnership = false)]
     public void TargetButtonInteractedServerRpc()
     {
         if (!IsServer) return;
 
-        if (!isGamePlaying.Value)
-        {
-            StartGameRound();
-        }
-        else
-        {
-            EvaluateQuotaAndReturn();
-        }
+        if (!isGamePlaying.Value) StartGameRound();
+        else EvaluateQuotaAndReturn();
     }
 
     private void StartGameRound()
     {
         if (!IsServer) return;
 
-        Debug.Log($"[½Ã½ºÅÛ] ¶ó¿îµå {currentRound.Value} ½ÃÀÛ! ¸ñÇ¥ ¾Ë °³¼ö: {quotaRequired.Value}°³");
+        Debug.Log($"[GameManager] ë¼ìš´ë“œ {currentRound.Value} ì‹œì‘. ëª©í‘œ: {quotaRequired.Value}ê°œ");
 
         if (houseMapPrefab != null)
         {
             spawnedMap = Instantiate(houseMapPrefab, playMapSpawnPoint.position, Quaternion.identity);
             NetworkObject mapNetObj = spawnedMap.GetComponent<NetworkObject>();
-            if (mapNetObj != null)
-            {
-                mapNetObj.Spawn();
-            }
+            if (mapNetObj != null) mapNetObj.Spawn();
 
             Physics.SyncTransforms();
 
+            // ì„œë²„ì™€ ëª¨ë“  í´ë¼ì´ì–¸íŠ¸ê°€ ë™ì¼í•œ ì‹œë“œë¡œ ë§µì„ ìƒì„±í•´ì•¼ ë ˆì´ì•„ì›ƒì´ ì¼ì¹˜í•¨
             MapGenerator mapGen = FindFirstObjectByType<MapGenerator>();
             if (mapGen != null)
             {
@@ -87,16 +85,14 @@ public class GameManager : NetworkBehaviour
 
     private IEnumerator TeleportDelayRoutine()
     {
-        yield return new WaitForSeconds(0.15f);
+        // ë§µ ìƒì„±ê³¼ ë¬¼ë¦¬ ì²˜ë¦¬ê°€ ì™„ë£Œëœ í›„ í…”ë ˆí¬íŠ¸í•´ì•¼ ìºë¦­í„°ê°€ ë°”ë‹¥ì— ì œëŒ€ë¡œ ì°©ì§€í•¨
+        yield return new WaitForSeconds(MapSpawnDelay);
 
-        if (playMapSpawnPoint != null)
-        {
-            TeleportAllPlayers(playMapSpawnPoint.position + Vector3.up * 1.5f);
-        }
-        else
-        {
-            TeleportAllPlayers(new Vector3(0f, 1002f, 0f));
-        }
+        Vector3 spawnPos = playMapSpawnPoint != null
+            ? playMapSpawnPoint.position + Vector3.up * 1.5f
+            : new Vector3(0f, 1002f, 0f);
+
+        TeleportAllPlayers(spawnPos);
     }
 
     [ClientRpc]
@@ -105,19 +101,17 @@ public class GameManager : NetworkBehaviour
         if (IsServer) return;
 
         MapGenerator mapGen = FindFirstObjectByType<MapGenerator>();
-        if (mapGen != null)
-        {
-            mapGen.BuildNewMapFromSeed(seed);
-        }
+        if (mapGen != null) mapGen.BuildNewMapFromSeed(seed);
     }
 
+    // íŒŒë¦¬í‚¹ ì…ìƒ ì˜¤ë¸Œì íŠ¸ì— ì•Œì´ ë‹¿ì„ ë•Œ í˜¸ì¶œë˜ì–´ ì´ë²ˆ ë¼ìš´ë“œ ì œì¶œ ìˆ˜ë¥¼ 1 ì¦ê°€
     [ServerRpc(RequireOwnership = false)]
     public void SubmitEggServerRpc()
     {
         if (!IsServer) return;
 
         eggsSubmittedThisRound.Value += 1;
-        Debug.Log($"[ÆÄ¸®´ë¿Õ] ¾Ë Èí¼ö ¿Ï·á! ÇöÀç Á¦Ãâ·®: {eggsSubmittedThisRound.Value} / ¸ñÇ¥: {quotaRequired.Value}");
+        Debug.Log($"[GameManager] ì•Œ ì œì¶œ. {eggsSubmittedThisRound.Value} / {quotaRequired.Value}");
     }
 
     private void EvaluateQuotaAndReturn()
@@ -126,8 +120,9 @@ public class GameManager : NetworkBehaviour
 
         if (eggsSubmittedThisRound.Value >= quotaRequired.Value)
         {
-            Debug.Log($"[½Ã½ºÅÛ] ÇÒ´ç·® ´Ş¼º ¼º°ø! ¹ÙÄ£ ¾Ë {eggsSubmittedThisRound.Value}°³°¡ »óÁ¡ ÀçÈ­·Î È¯ÀüµË´Ï´Ù.");
+            Debug.Log($"[GameManager] í• ë‹¹ëŸ‰ ë‹¬ì„±! {eggsSubmittedThisRound.Value}ê°œ ì œì¶œ.");
 
+            // ì´ë²ˆ ë¼ìš´ë“œ ì œì¶œëŸ‰ì„ ê³µìœ  ì¬í™”ì— í•©ì‚°í•œ ë’¤ ë‹¤ìŒ ë¼ìš´ë“œë¥¼ ì¤€ë¹„
             sharedEggCount.Value += eggsSubmittedThisRound.Value;
             currentRound.Value += 1;
             quotaRequired.Value = CalculateNextQuota(currentRound.Value);
@@ -141,65 +136,59 @@ public class GameManager : NetworkBehaviour
         }
     }
 
+    // í• ë‹¹ëŸ‰ ê³µì‹: ê¸°ë³¸ê°’ 3ì—ì„œ ì‹œì‘í•´ ë¼ìš´ë“œë§ˆë‹¤ ì„ í˜•(Ã—5)ê³¼ ë¹„ì„ í˜•(Ã—2.5) ì¦ê°€ë¥¼ í•©ì‚°
+    // ì˜ˆ) 1ë¼ìš´ë“œ=3, 2ë¼ìš´ë“œ=10, 3ë¼ìš´ë“œ=19, 4ë¼ìš´ë“œ=30 ...
     private int CalculateNextQuota(int round)
     {
         return 3 + (round - 1) * 5 + (int)(round * 2.5f);
     }
 
+    // ì „ íŒ€ ì „ë©¸ ë˜ëŠ” ê·€í™˜ ì‹œ í• ë‹¹ëŸ‰ ë¯¸ë‹¬ì´ë©´ ê²Œì„ì˜¤ë²„ ì²˜ë¦¬
+    // ëª¨ë“  ìˆ˜ì¹˜ë¥¼ ì´ˆê¸°í™”í•˜ê³  ê²Œì„ì˜¤ë²„ UIë¥¼ ë³´ì—¬ì¤€ ë’¤ ì¼ì • ì‹œê°„ í›„ ë¡œë¹„ë¡œ ë³µê·€
     public void TriggerGameOver()
     {
-        Debug.Log($"[°ÔÀÓ ¿À¹ö] ÆÄ¸® ´ë¿ÕÀ» ¸¸Á·½ÃÅ°Áö ¸øÇß½À´Ï´Ù! (¶Ç´Â Àü¸ê) ÃÖÁ¾ ¶ó¿îµå: {currentRound.Value}");
+        Debug.Log($"[GameManager] ê²Œì„ì˜¤ë²„. ë¼ìš´ë“œ: {currentRound.Value}");
 
         currentRound.Value = 1;
         quotaRequired.Value = 3;
         eggsSubmittedThisRound.Value = 0;
         sharedEggCount.Value = 0;
 
-        // ? [¼öÁ¤µÊ] UI ¸Å´ÏÀú È£Ãâ ¹× ·Îºñ ±ÍÈ¯ Áö¿¬
         if (gameOverManager != null)
         {
-            // UI¸¦ ¶ç¿ì°í ÀÌ¹ÌÁö¸¦ ³Ñ±é´Ï´Ù.
             gameOverManager.TriggerGameOverUI();
-
-            // ÀÌ¹ÌÁö 3Àå x 3ÃÊ = 9ÃÊÀÌ¹Ç·Î, 10ÃÊ µÚ¿¡ ·Îºñ·Î ÅÚ·¹Æ÷Æ® ½ÃÅµ´Ï´Ù.
-            StartCoroutine(DelayedReturnToLobby(10f));
+            StartCoroutine(DelayedReturnToLobby(GameOverReturnDelay));
         }
         else
         {
-            // UI°¡ ¿¬°á ¾È µÇ¾î ÀÖÀ¸¸é ¹Ù·Î ±ÍÈ¯ÇÕ´Ï´Ù.
             ReturnToLobby();
         }
     }
 
-    // ? [»õ·Î Ãß°¡µÊ] ÀÏÁ¤ ½Ã°£ ´ë±â ÈÄ ·Îºñ·Î ±ÍÈ¯ÇÏ´Â ÄÚ·çÆ¾
     private IEnumerator DelayedReturnToLobby(float delay)
     {
         yield return new WaitForSeconds(delay);
         ReturnToLobby();
 
-        // ÅÚ·¹Æ÷Æ® ¿Ï·á ÈÄ °ÔÀÓ ¿À¹ö Äµ¹ö½º¸¦ ´İ¾ÆÁİ´Ï´Ù.
         if (gameOverManager != null)
-        {
             gameOverManager.HideGameOverUIClientRpc();
-        }
     }
 
     private void ReturnToLobby()
     {
         if (!IsServer) return;
 
-        if (lobbySpawnPoint != null) TeleportAllPlayers(lobbySpawnPoint.position + Vector3.up * 1f);
-        else TeleportAllPlayers(new Vector3(0f, 1.5f, 0f));
+        Vector3 lobbyPos = lobbySpawnPoint != null
+            ? lobbySpawnPoint.position + Vector3.up * 1f
+            : new Vector3(0f, 1.5f, 0f);
 
+        TeleportAllPlayers(lobbyPos);
         CleanUpAllSpawnedObjects();
 
         if (spawnedMap != null)
         {
             NetworkObject mapNetObj = spawnedMap.GetComponent<NetworkObject>();
-            if (mapNetObj != null && mapNetObj.IsSpawned)
-            {
-                mapNetObj.Despawn();
-            }
+            if (mapNetObj != null && mapNetObj.IsSpawned) mapNetObj.Despawn();
             Destroy(spawnedMap);
         }
 
@@ -210,42 +199,31 @@ public class GameManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        CleanUpTags("Food");
-        CleanUpTags("Enemy");
-        CleanUpTags("Cobweb");
-        CleanUpTags("Egg");
+        CleanUpByTag("Food");
+        CleanUpByTag("Enemy");
+        CleanUpByTag("Cobweb");
+        CleanUpByTag("Egg");
     }
 
-    private void CleanUpTags(string tagName)
+    // í•´ë‹¹ íƒœê·¸ì˜ ëª¨ë“  ì˜¤ë¸Œì íŠ¸ë¥¼ ë„¤íŠ¸ì›Œí¬ ë™ê¸°í™”ë¥¼ ìœ ì§€í•˜ë©´ì„œ ì œê±°
+    // NetworkObjectê°€ ìˆìœ¼ë©´ Despawn, ì—†ìœ¼ë©´ ì¼ë°˜ Destroy ì‚¬ìš©
+    private void CleanUpByTag(string tag)
     {
-        GameObject[] objects = GameObject.FindGameObjectsWithTag(tagName);
-        foreach (GameObject obj in objects)
+        foreach (GameObject obj in GameObject.FindGameObjectsWithTag(tag))
         {
             NetworkObject netObj = obj.GetComponent<NetworkObject>();
-            if (netObj != null && netObj.IsSpawned)
-            {
-                netObj.Despawn();
-            }
-            else
-            {
-                Destroy(obj);
-            }
+            if (netObj != null && netObj.IsSpawned) netObj.Despawn();
+            else Destroy(obj);
         }
     }
 
+    // ì‚¬ë§í•œ í”Œë ˆì´ì–´ëŠ” í…”ë ˆí¬íŠ¸ ëŒ€ì‹  ë¶€í™œ ì²˜ë¦¬ë¥¼ í•´ì•¼ Rigidbodyì™€ ì½œë¼ì´ë”ê°€ ì •ìƒ ë³µêµ¬ë¨
     private void TeleportAllPlayers(Vector3 targetPosition)
     {
-        PlayerMovement[] allPlayers = FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None);
-        foreach (PlayerMovement player in allPlayers)
+        foreach (PlayerMovement player in FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None))
         {
-            if (player.isDead.Value)
-            {
-                player.ReviveServerRpc(targetPosition);
-            }
-            else
-            {
-                player.TeleportClientRpc(targetPosition);
-            }
+            if (player.isDead.Value) player.ReviveServerRpc(targetPosition);
+            else player.TeleportClientRpc(targetPosition);
         }
     }
 }
