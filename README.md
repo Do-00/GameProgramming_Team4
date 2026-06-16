@@ -1,11 +1,8 @@
-<div align="center"><img width="514" height="290" alt="open" src="https://github.com/user-attachments/assets/e46a2086-6e97-4feb-a333-7a2794110b9e" width="80%"/></div>
+<div align="center"><img width="1296" height="718" alt="open" src="https://github.com/user-attachments/assets/e46a2086-6e97-4feb-a333-7a2794110b9e" width="80%"/></div>
 
-# Mort en Bourdonnant
+# <div align="center">Mort en Bourdonnant 
 
-**파리대왕의 명을 받아 인간의 집에 스며드는 협동 생존 게임**
-
-
-<sub><i>"Death, while buzzing." — A co-op survival game where you are a fly.</i></sub>
+**<div align="center">파리대왕의 명을 받아 인간의 집에 스며드는 협동 생존 게임**
 
 <br/>
 
@@ -17,13 +14,13 @@
 ![Genre](https://img.shields.io/badge/Genre-Lethal--like-E05555)
 ![Status](https://img.shields.io/badge/Status-Demo-2ea043)
 
-<br/><br/>
+
 
 [<img src="Assets/UI/pheromone.png" width="24" align="top"/> 시연 영상 ](youtube.com/watch?v=9QQarRtKDgo&source_ve_path=MjM4NTE&embeds_referring_euri=https%3A%2F%2Fcafe.naver.com%2F)
 [<img src="Assets/UI/dash.png" width="24" align="top"/> 최종 발표 슬라이드](https://docs.google.com/presentation/d/1ZB4qu6_4U1Y3EyLE2RibS6REm2xDPt53/edit?slide=id.p5#slide=id.p5)
 </details>
-<!-- 🎬 첫 화면 게임플레이 GIF (가장 멋진 장면 5~10초) -->
-<img src="assets/gameplay.gif" alt="Gameplay" width="80%"/>
+
+<img src="assets/gameplay.gif" width="450"/>
 
 </div>
 
@@ -35,18 +32,14 @@
 - [스토리](#-스토리)
 - [핵심 특징](#-핵심-특징)
 - [등장하는 적](#-등장하는-적)
-- [조작 방법](#-조작-방법)
 - [구현 기능](#-구현-기능)
-- [스크린샷](#-스크린샷)
 - [기술 스택](#-기술-스택)
-- [실행 방법](#-실행-방법)
 - [팀 소개](#-팀-소개)
-- [라이선스](#-라이선스)
 
 ---
 
-## 🎮 게임 소개
-<img width="1198" height="674" alt="1" src="https://github.com/user-attachments/assets/be3f06e4-5799-4a88-b075-d583e6d5f7bb" />
+## <img src="Assets/UI/heart.png" width="24" align="top"/> 게임 소개
+<img width="514" height="290" src="https://github.com/user-attachments/assets/be3f06e4-5799-4a88-b075-d583e6d5f7bb" />
 
 
 > 한 줄 컨셉: **"파리가 되어 인간의 집에 침투해 음식을 먹고 알을 바치는 협동 멀티플레이 생존 게임"**
@@ -55,7 +48,7 @@
 플레이어는 파리가 되어 인간의 집에 잠입하고, 음식을 먹어 유충(알)을 만들어 파리대왕에게 바칩니다.
 고양이와 거미가 도사리는 집을 동료와 함께 헤쳐 나가는 **2~4인 협동 플레이**에 초점을 맞췄습니다.
 
-<sub>📚 서경대학교 게임프로그래밍 수업 · 4조 팀 프로젝트</sub>
+<sub> 서경대학교 게임프로그래밍 수업 · 4조 팀 프로젝트</sub>
 
 ---
 
@@ -67,24 +60,30 @@
 
 ---
 
-## ✨ 핵심 특징
-<img width="572" height="322" alt="egg" src="https://github.com/user-attachments/assets/9aff6914-9cad-4b45-a531-f62fadb7e4d9" />
+##  <img src="Assets/UI/money.png" width="24" align="top"/> 핵심 특징
+<img width="514" height="290" alt="egg" src="https://github.com/user-attachments/assets/9aff6914-9cad-4b45-a531-f62fadb7e4d9" />
 
 ### 🍖 '허기' 시스템 — 채워지는 스탯
+
 맵에 음식을 먹고 허기게이지를 채우면 알을 그자리에서 낳아버립니다. 
 플레이어는 그 알을 기지까지 안전히 수거해가야합니다. 
-<img width="946" height="532" alt="jump" src="https://github.com/user-attachments/assets/9036da81-d380-4131-ba13-3f65c58cc702" />
+
+<img width="514" height="290" alt="jump" src="https://github.com/user-attachments/assets/9036da81-d380-4131-ba13-3f65c58cc702" />
 
 ### 🤝 2~4인 협동 멀티플레이
+
 혼자가 아니라 동료와 함께. 멀티플레이를 중심으로 게임의 재미를 설계했습니다.
 
-<img width="1296" height="718" alt="screenshot_play" src="https://github.com/user-attachments/assets/4f8c0f12-bcaf-409e-9198-1dd2bc54213c" />
+<img width="514" height="290" alt="screenshot_play" src="https://github.com/user-attachments/assets/4f8c0f12-bcaf-409e-9198-1dd2bc54213c" />
 
 ### 🗺️ 절차적 맵 생성
+
 **랜덤 시드** 기반으로 매 플레이마다 방 구성이 달라져 반복 플레이의 재미를 더합니다.
-<img width="472" height="266" alt="MedalTVMultiplayTestWithUnity20260611224552049" src="https://github.com/user-attachments/assets/8f188eff-be28-40d0-964f-8ff07aa831df" />
+
+<img width="514" height="290" alt="MedalTVMultiplayTestWithUnity20260611224552049" src="https://github.com/user-attachments/assets/8f188eff-be28-40d0-964f-8ff07aa831df" />
 
 ### 🔥 매판 늘어나는 할당량
+
 라운드마다 급격히 늘어나는 할당량의 채우기 위해 플레이어들은 위험을 무릅쓰고 집에 들어갑니다. 
 모든 플레이어가 사망하거나 할당량을 채우지 못할 경우 
 파리대왕의 제물로 바쳐져 **게임오버**가 됩니다. 
@@ -94,21 +93,23 @@
 ## 🐾 등장하는 적
 
 🐱 **고양이**  
+
 - 맵을 배회하다 플레이어를 감지
 - 감지 시 **플레이어의 높이에 따라** 다른 공격을 가함
 
-<img width="664" height="374" alt="cat" src="https://github.com/user-attachments/assets/456a46ce-fe59-46d0-b1a9-12a2ea95d106" width="40"/>
+<img width="514" height="290" alt="cat" src="https://github.com/user-attachments/assets/456a46ce-fe59-46d0-b1a9-12a2ea95d106" width="450"/>
 
 🕷️ **거미** 
+
 - 맵을 배회하며 **거미줄**을 생성
 - 거미줄에 닿은 플레이어를 감지해 **추적** 
 
-<img width="748" height="420" alt="spider" src="https://github.com/user-attachments/assets/2f329a71-5505-48db-830e-6b5c24ce96e6" width="40"/>
+<img width="514" height="290" alt="spider" src="https://github.com/user-attachments/assets/2f329a71-5505-48db-830e-6b5c24ce96e6" width="450"/>
 
 
 ---
 
-## 🕹️ 조작 방법
+## <img src="Assets/UI/aim_defaultaim.png" width="24" align="top"/> 조작 방법
 
 | 동작 | 키 |
 | :--- | :---: |
@@ -121,8 +122,7 @@
 
 
 ---
-
-## ✅ 구현 기능
+## <img src="Assets/UI/aim_Food.png" width="24" align="top"/> 구현 기능
 
 - [x] 2~4인 협동 멀티플레이 (네트워킹)
 - [x] 플레이어 조작, 스킬
@@ -132,13 +132,10 @@
 - [x] 거리별 공간 음향 조절
 - [x] 코어 루프 완성
 
----
+## <img src="Assets/UI/skill_able.png" width="24" align="top"/> 기술 스택
 
-## 🛠️ 기술 스택
-
-- |**엔진**: Unity 6000.3.12f1 (또는 사용한 버전)
+- **엔진**: Unity 6000.3.12f1 (또는 사용한 버전)
 - **언어**: C#
-- **네트워킹**: Mirror / Photon / Netcode for GameObjects 등
 - **버전 관리**: Git, GitHub
 
 네트워크 & 멀티플레이어
