@@ -170,7 +170,7 @@
 
 | 이름 | 역할 | GitHub |
 | :---: | :--- | :---: |
-| 도윤재 | 기획 / 조작  | [@Stone-Kirby](https://github.com/Stone-Kirby) |
+| 도윤재 | 기획 / 조작  | [@Do-00](https://github.com/Do-00) |
 | 유동현 | 네트워킹/시스템 | [@ontip11](https://github.com/ontip11) |
 | 최유빈 | UI / 애니메이션 | [@youbin999](https://github.com/youbin999) |
 
